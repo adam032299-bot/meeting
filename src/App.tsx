@@ -268,6 +268,51 @@ const getAdvisorIcon = (iconName: string) => {
   }
 };
 
+const getDynamicNewsHeadline = (scenarioTitle: string, chosenOptionTitle: string, chosenOptionId: string): string => {
+  const title = scenarioTitle || "";
+  if (title.includes("氣球") || title.includes("領空")) {
+    return "美軍戰機緊急升空，白宮就不明飛行物入侵發表警告";
+  }
+  if (title.includes("古巴") || title.includes("哈瓦那")) {
+    return "五角大廈加強海外巡邏，警告不容許核彈防禦漏洞";
+  }
+  if (title.includes("軍演") || title.includes("台海")) {
+    return "第七艦隊突入南海與台海，軍事警戒等級全面提升";
+  }
+  if (title.includes("關稅") || title.includes("貿易") || title.includes("傾銷")) {
+    return "白宮經濟委員會特別行動：實施一整套最新對外貿易制裁";
+  }
+  if (title.includes("晶片") || title.includes("科技") || title.includes("半導體") || title.includes("AI")) {
+    return "商務部宣布高科技關鍵技術禁運，誓言維護美利堅科技主權";
+  }
+  if (title.includes("邊境") || title.includes("移民") || title.includes("圍牆")) {
+    return "白宮簽署最新邊境安全行政命令，國土安全局增派突擊隊";
+  }
+  if (title.includes("中東") || title.includes("伊朗") || title.includes("蘇門答臘")) {
+    return "波斯灣護航行動啟動，聯軍發言人稱不允許能源命脈受阻";
+  }
+  if (title.includes("烏克蘭") || title.includes("俄羅斯") || title.includes("北約")) {
+    return "北約盟軍最高統帥召集代表大會，擬定最新歐洲防衛協定";
+  }
+  if (title.includes("美日") || title.includes("日本") || title.includes("首腦")) {
+    return "美日發表聯合防衛宣言，深化新時代亞太雙邊軍事互信";
+  }
+  if (title.includes("北韓") || title.includes("朝鮮")) {
+    return "防空反導實時系統激活，三國最高指揮官下達戒備令";
+  }
+  if (title.includes("金融") || title.includes("聯準會")) {
+    return "財政部與聯準會發布聯合通告，力保美金全球儲備信譽";
+  }
+  
+  if (chosenOptionId === "A") {
+    return `白宮對「${title}」祭出最高規格強硬干預，全球市場震動`;
+  }
+  if (chosenOptionId === "B") {
+    return `國務院啟動戰術性多邊外交斡旋，以尋求各方互惠利益平衡`;
+  }
+  return `商務部與跨部門行動組實施戰略圍堵，提升關鍵領域防禦管制`;
+};
+
 export default function App() {
   const { user, loading: authLoading, logout, isPlaceholderFirebase, syncToGAS } = useAuth();
 
@@ -603,6 +648,7 @@ export default function App() {
   const [emailDraftResult, setEmailDraftResult] = useState<{ subject: string; body: string } | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
   const [historyModalTab, setHistoryModalTab] = useState<"current" | "archive">("current");
+  const [expandedArchiveGameId, setExpandedArchiveGameId] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
 
   // States for choice results panel & countdown
@@ -1650,20 +1696,84 @@ export default function App() {
                     <p className="text-xs font-medium">尚無歷史決策</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {history.slice().reverse().slice(0, 3).map((item, index) => {
-                      const originalTurnNum = history.length - index;
-                      return (
-                        <div key={`timeline-mobile-${index}`} className="flex gap-2 items-start">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
-                          <div className="flex-1 min-w-0 text-slate-200">
-                            <span className="text-xs font-bold text-amber-500 mr-2">第 {originalTurnNum} 回合</span>
-                            <h4 className="text-[14px] font-medium inline">{item.scenarioTitle}</h4>
-                            <span className="block text-xs text-slate-400 mt-0.5">執行方案: {item.chosenOptionTitle}</span>
+                  <div className="overflow-y-auto max-h-[360px] pr-1 flex flex-col gap-4 relative before:absolute before:left-[11px] before:top-2.5 before:bottom-2.5 before:w-[2px] before:bg-slate-850 custom-scrollbar">
+                    {history
+                      .slice()
+                      .reverse()
+                      .slice(0, 4)
+                      .map((item, index) => {
+                        const originalTurnNum = history.length - index;
+                        const econDiff = item.statsAfter.economy - item.statsBefore.economy;
+                        const milDiff = item.statsAfter.military - item.statsBefore.military;
+                        const dipDiff = item.statsAfter.diplomacy - item.statsBefore.diplomacy;
+                        const opinionDiff = item.statsAfter.publicOpinion - item.statsBefore.publicOpinion;
+                        const indDiff = item.statsAfter.industry - item.statsBefore.industry;
+                        const mktDiff = item.statsAfter.market - item.statsBefore.market;
+
+                        const statChanges = [
+                          { name: "經濟", diff: econDiff },
+                          { name: "軍事", diff: milDiff },
+                          { name: "外交", diff: dipDiff },
+                          { name: "民意", diff: opinionDiff },
+                          { name: "科技監控", diff: indDiff },
+                          { name: "股市", diff: mktDiff },
+                        ].filter(s => s.diff !== 0);
+
+                        const headline = getDynamicNewsHeadline(item.scenarioTitle, item.chosenOptionTitle, item.chosenOptionId);
+
+                        return (
+                          <div key={`timeline-mobile-${index}`} className="flex gap-3.5 items-start relative py-0.5">
+                            {/* Point on timeline */}
+                            <div className="h-5 flex items-center shrink-0 z-10">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#f5a623] border-2 border-[#0c0f1b] ring-4 ring-amber-500/10 shadow-[0_0_6px_rgba(245,158,11,0.4)]" />
+                            </div>
+                            <div className="flex-grow min-w-0 flex flex-col gap-1 text-left">
+                              <div className="flex items-center justify-between text-[10px] font-mono">
+                                <span className="font-extrabold text-[#f5a623] uppercase tracking-widest">
+                                  第 {originalTurnNum} 回合
+                                </span>
+                                <span className="text-slate-500">
+                                  {item.dateString}
+                                </span>
+                              </div>
+                              <h4 className="text-xs font-extrabold text-slate-100 leading-snug">
+                                {item.scenarioTitle}
+                              </h4>
+                              
+                              {/* Decision */}
+                              <div className="text-[11px] text-slate-300 leading-normal font-sans bg-slate-950/65 p-2 rounded-lg border border-slate-850/60 mt-0.5">
+                                <span className="text-[#f5a623] font-extrabold mr-1 font-mono">決策：</span>
+                                {item.chosenOptionTitle}
+                              </div>
+
+                              {/* Impacts list */}
+                              {statChanges.length > 0 && (
+                                <div className="flex flex-wrap gap-1 items-center mt-1">
+                                  <span className="text-[9px] font-mono text-slate-500 mr-1 uppercase select-none">影響：</span>
+                                  {statChanges.map((sc, scIdx) => (
+                                    <span 
+                                      key={scIdx} 
+                                      className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border border-slate-800 ${
+                                        sc.diff >= 0 
+                                          ? "text-emerald-400 bg-emerald-500/5" 
+                                          : "text-rose-400 bg-rose-500/5"
+                                      }`}
+                                    >
+                                      {sc.name} {sc.diff >= 0 ? `+${sc.diff}` : sc.diff}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* News headline block */}
+                              <div className="text-[10px] text-slate-400 italic leading-relaxed border-l-2 border-amber-500/20 pl-2.5 mt-1.5 font-medium">
+                                <span className="text-slate-500 not-italic font-extrabold text-[8.5px] block uppercase font-mono tracking-widest mb-0.5">歷史快訊：</span>
+                                {headline}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 )}
               </div>
@@ -1705,19 +1815,150 @@ export default function App() {
           {/* Dynamic global modals for mobile history view */}
           <AnimatePresence>
             {isHistoryModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                <div className="bg-[#0c0f1b] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
-                  <div className="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-[#0e1222]">
-                    <h3 className="text-base font-bold text-white">歷次決策備忘錄</h3>
-                    <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-white p-1">✕</button>
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+                <div className="bg-[#0b0e17] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[82vh] text-left">
+                  {/* Header */}
+                  <div className="px-5 py-3.5 border-b border-slate-800 flex justify-between items-center bg-[#0e1222]">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                        <span>📜</span> 歷次決策備忘錄
+                      </h3>
+                      <p className="text-[9px] font-mono text-slate-500 uppercase mt-0.5">
+                        National Archive Mobile Portal
+                      </p>
+                    </div>
+                    <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800/50 rounded-lg transition-colors">✕</button>
                   </div>
-                  <div className="p-4 overflow-y-auto space-y-4 max-h-full">
-                    {history.map((h, i) => (
-                      <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-left">
-                        <span className="text-xs font-mono text-amber-500 font-bold">第 {i+1} 回合：{h.scenarioTitle}</span>
-                        <p className="text-sm text-[#F5A623] mt-1 font-semibold">✓ {h.chosenOptionTitle}</p>
-                      </div>
-                    ))}
+
+                  {/* Mobile Tab Switcher */}
+                  <div className="flex border-b border-slate-800/60 bg-[#080b13] px-4 gap-4 shrink-0">
+                    <button
+                      onClick={() => setHistoryModalTab("current")}
+                      className={`py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                        historyModalTab === "current"
+                          ? "border-amber-500 text-amber-400"
+                          : "border-transparent text-slate-400"
+                      }`}
+                    >
+                      <span>🏛️</span> 本局 ({history.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        setHistoryModalTab("archive");
+                        fetchGameHistoryList();
+                      }}
+                      className={`py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                        historyModalTab === "archive"
+                          ? "border-amber-500 text-amber-400"
+                          : "border-transparent text-slate-400"
+                      }`}
+                    >
+                      <span>🗄️</span> 存檔庫 ({historyList.length})
+                    </button>
+                  </div>
+
+                  {/* List Content */}
+                  <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-3 max-h-full bg-[#0a0d16]/20">
+                    {historyModalTab === "current" ? (
+                      history.length === 0 ? (
+                        <div className="py-12 text-center text-slate-500 italic text-xs">
+                          暫無歷史決策。請在會議中發出您的第一條政令！
+                        </div>
+                      ) : (
+                        history.map((h, i) => (
+                          <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 text-left flex flex-col gap-1.5 relative">
+                            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                              <span className="text-amber-500 font-bold">第 {h.daysOfPresidency} 天 ({h.dateString})</span>
+                              <span>回合 #{i+1}</span>
+                            </div>
+                            <h4 className="text-xs font-bold text-gray-200">
+                              議題：「{h.scenarioTitle}」
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              指令: <span className="text-amber-400 font-bold">{h.chosenOptionId} - {h.chosenOptionTitle}</span>
+                            </p>
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      /* Archive Mobile */
+                      isHistoryLoading ? (
+                        <div className="py-12 text-center flex flex-col items-center justify-center text-slate-400 text-xs">
+                          <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
+                          下載安全雲端存檔中...
+                        </div>
+                      ) : historyList.length === 0 ? (
+                        <div className="py-12 text-center text-slate-500 italic text-xs">
+                          全球戰略存檔庫尚無紀錄。
+                        </div>
+                      ) : (
+                        historyList.map((item, index) => {
+                          const isExpanded = expandedArchiveGameId === item.gameId;
+                          
+                          let ratingColor = "text-blue-400 bg-blue-500/10 border-blue-500/20";
+                          if (item.rating === "S") ratingColor = "text-amber-400 bg-amber-500/10 border-amber-500/30";
+                          else if (item.rating === "A") ratingColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+                          else if (item.rating === "D") ratingColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
+
+                          return (
+                            <div
+                              key={item.gameId || index}
+                              className={`p-3 bg-slate-900/50 border border-slate-800/80 rounded-xl flex flex-col gap-2.5 transition-all ${
+                                isExpanded ? "border-amber-500/40 bg-slate-900/75" : ""
+                              }`}
+                            >
+                              <div
+                                onClick={() => setExpandedArchiveGameId(isExpanded ? null : item.gameId)}
+                                className="flex items-start justify-between cursor-pointer"
+                              >
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-200 leading-none">{item.endingName}</span>
+                                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${ratingColor}`}>等級 {item.rating}</span>
+                                  </div>
+                                  <span className="text-[9px] font-mono text-slate-500 mt-1 block">總分: {item.totalScore} | {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-500 shrink-0 select-none">{isExpanded ? "收合 ▲" : "展開 ▼"}</span>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="border-t border-slate-850 pt-2 flex flex-col gap-2 font-sans">
+                                  {item.aiHistoricalReview && (
+                                    <div className="p-2.5 bg-[#090d16] rounded border border-slate-800/40 text-[11px] leading-relaxed text-slate-400 italic font-mono select-text">
+                                      🤖 AI 歷史評論: "{item.aiHistoricalReview}"
+                                    </div>
+                                  )}
+                                  {item.decisions && (
+                                    <div className="space-y-1.5">
+                                      <span className="text-[10px] font-bold text-slate-400 block">回合指令記存:</span>
+                                      <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-1">
+                                        {item.decisions.map((dec: any, decIdx: number) => (
+                                          <div key={decIdx} className="text-[11px] leading-snug text-slate-300 pl-1.5 border-l border-slate-800 py-0.5">
+                                            <span className="text-amber-500 font-mono font-bold mr-1">[R#{dec.round}]</span>
+                                            {dec.scenarioTitle}
+                                            <span className="block text-[10px] text-amber-500/80 font-semibold pl-4">✓ {dec.chosenOptionTitle}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="px-5 py-3 border-t border-slate-800 bg-[#0e1220] flex justify-end shrink-0">
+                    <button
+                      onClick={() => setIsHistoryModalOpen(false)}
+                      className="px-4 py-2 bg-amber-500 text-black font-extrabold text-xs rounded-xl transition"
+                    >
+                      關閉備忘錄
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2186,7 +2427,7 @@ export default function App() {
           </div>
           
           {/* SECTION 3: 歷史紀錄 */}
-          <div className={`group/history relative w-full mb-6 flex flex-col ${isSidebarCollapsed ? "" : "h-[150px]"}`}>
+          <div className={`group/history relative w-full mb-6 flex flex-col ${isSidebarCollapsed ? "" : "h-[265px]"}`}>
             {isSidebarCollapsed ? (
               <div className="w-full flex justify-center">
                 <button
@@ -2226,7 +2467,7 @@ export default function App() {
                         歷史紀錄
                       </span>
                     </div>
-                    {history.length > 2 && (
+                    {history.length > 0 && (
                       <span className="text-[10px] font-mono text-slate-500 hover:text-amber-400">
                         查看全部 ({history.length}) »
                       </span>
@@ -2243,26 +2484,87 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col gap-1.5 relative before:absolute before:left-[7px] before:top-1.5 before:bottom-1.5 before:w-[1px] before:bg-slate-800 overflow-hidden pr-1 select-text">
+                  <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-3.5 relative before:absolute before:left-[11px] before:top-2.5 before:bottom-2.5 before:w-[2px] before:bg-slate-850 custom-scrollbar select-text">
                     {history
                       .slice() // copy to avoid mutating state
                       .reverse() // reverse to show latest first
-                      .slice(0, 2) // take max 2 records to keep 120px height clean
                       .map((item, index) => {
                         const originalTurnNum = history.length - index;
+                        const econDiff = item.statsAfter.economy - item.statsBefore.economy;
+                        const milDiff = item.statsAfter.military - item.statsBefore.military;
+                        const dipDiff = item.statsAfter.diplomacy - item.statsBefore.diplomacy;
+                        const opinionDiff = item.statsAfter.publicOpinion - item.statsBefore.publicOpinion;
+                        const indDiff = item.statsAfter.industry - item.statsBefore.industry;
+                        const mktDiff = item.statsAfter.market - item.statsBefore.market;
+
+                        const statChanges = [
+                          { name: "經濟", diff: econDiff },
+                          { name: "軍事", diff: milDiff },
+                          { name: "外交", diff: dipDiff },
+                          { name: "民意", diff: opinionDiff },
+                          { name: "科技監控", diff: indDiff },
+                          { name: "股市", diff: mktDiff },
+                        ].filter(s => s.diff !== 0);
+
+                        const headline = getDynamicNewsHeadline(item.scenarioTitle, item.chosenOptionTitle, item.chosenOptionId);
+
                         return (
-                          <div key={`timeline-${index}`} className="flex gap-2.5 items-start relative group/timeline py-0.5">
+                          <div 
+                            key={`timeline-${index}`} 
+                            className="flex gap-3.5 items-start relative group/timeline py-1 px-2.5 rounded-xl hover:bg-[#111625]/55 transition-all duration-200 border border-transparent hover:border-slate-800/45 cursor-pointer"
+                            onClick={() => {
+                              setHistoryModalTab("current");
+                              setIsHistoryModalOpen(true);
+                            }}
+                          >
                             {/* Point on timeline */}
-                            <div className="h-4 flex items-center shrink-0 z-10">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 border border-[#0d101d] ring-2 ring-amber-500/10 group-hover/timeline:scale-110 transition-transform" />
+                            <div className="h-5 flex items-center shrink-0 z-10">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#f5a623] border-2 border-[#090b13] ring-4 ring-amber-500/10 group-hover/timeline:scale-125 group-hover/timeline:bg-amber-400 group-hover/timeline:ring-amber-500/25 transition-all duration-300 shadow-[0_0_8px_rgba(245,158,11,0.4)]" />
                             </div>
-                            <div className="flex-grow min-w-0">
-                              <span className="text-[10px] font-bold text-amber-500 tracking-wider block font-sans leading-none">
-                                第 {originalTurnNum} 回合
-                              </span>
-                              <h4 className="text-[11.5px] font-medium text-slate-200 mt-0.5 leading-snug group-hover/timeline:text-amber-400 transition-colors truncate" title={item.scenarioTitle}>
+                            <div className="flex-grow min-w-0 flex flex-col gap-1 text-left">
+                              <div className="flex items-center justify-between text-[10px] font-mono">
+                                <span className="font-extrabold text-[#f5a623] uppercase tracking-widest">
+                                  第 {originalTurnNum} 回合
+                                </span>
+                                <span className="text-slate-500">
+                                  {item.dateString}
+                                </span>
+                              </div>
+                              
+                              <h4 className="text-[12px] font-extrabold text-slate-100 group-hover/timeline:text-amber-400 transition-colors leading-snug">
                                 {item.scenarioTitle}
                               </h4>
+
+                              {/* Decision */}
+                              <div className="text-[11px] text-slate-300 leading-normal font-sans bg-slate-950/50 p-2 rounded-lg border border-slate-850/60 mt-0.5">
+                                <span className="text-[#f5a623] font-black mr-1 font-mono">決策：</span>
+                                {item.chosenOptionTitle}
+                              </div>
+
+                              {/* Impacts list */}
+                              {statChanges.length > 0 && (
+                                <div className="flex flex-wrap gap-1 items-center mt-1">
+                                  <span className="text-[9.5px] font-mono text-slate-500 mr-1 uppercase select-none">影響：</span>
+                                  {statChanges.map((sc, scIdx) => (
+                                    <span 
+                                      key={scIdx} 
+                                      className={`text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                        sc.diff >= 0 
+                                          ? "text-emerald-400 bg-emerald-500/5 border-emerald-500/15" 
+                                          : "text-rose-400 bg-rose-500/5 border-rose-500/15"
+                                      }`}
+                                    >
+                                      {sc.name} {sc.diff >= 0 ? `+${sc.diff}` : sc.diff}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* News headline block */}
+                              <div className="text-[10.5px] text-slate-400 italic leading-relaxed border-l-2 border-amber-500/20 pl-2.5 mt-1.5 font-medium group-hover/timeline:text-slate-300 transition-colors">
+                                <span className="text-slate-500 not-italic font-extrabold text-[9px] block uppercase font-mono tracking-widest mb-0.5 select-none">歷史快訊：</span>
+                                {headline}
+                              </div>
                             </div>
                           </div>
                         );
@@ -3719,99 +4021,268 @@ export default function App() {
       {/* ── HISTORY MODAL (歷史政策軌跡備忘錄) ── */}
       <AnimatePresence>
         {isHistoryModalOpen && (
-          <div id="history-backdrop" className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div id="history-backdrop" className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               id="history-modal-card"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#0c0f18] border border-slate-800 rounded-2xl w-full max-w-[620px] shadow-3xl text-left overflow-hidden flex flex-col"
+              className="bg-[#0b0e17] border border-slate-800/90 rounded-2xl w-full max-w-[760px] shadow-3xl text-left overflow-hidden flex flex-col h-[85vh]"
             >
               {/* Header */}
-              <div className="px-6 py-4 border-b border-slate-800/60 bg-[#0f1424] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <History className="w-5 h-5 text-amber-500" />
-                  <h3 className="text-sm font-bold tracking-wider text-[#cbd5e1]">
-                    顧問參議歷史政策軌跡
-                  </h3>
+              <div className="px-6 py-4 border-b border-slate-800/80 bg-[#0e1222] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                    <History className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold tracking-wider text-slate-100 font-sans">
+                      白宮國家政策智庫備忘錄
+                    </h3>
+                    <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
+                      National Policy Library Archive System
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setIsHistoryModalOpen(false)}
-                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* List */}
-              <div className="p-6 overflow-y-auto max-h-[60vh] flex flex-col gap-4">
-                {history.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic text-center py-8">暫無歷史決策路徑。請在白宮會議中發出您的第一條決策指令！</p>
-                ) : (
-                  history.map((h, i) => (
-                    <div key={i} className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl text-left flex flex-col gap-2">
-                      <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="text-amber-500">
-                          第 {h.daysOfPresidency} 天 ({h.dateString})
-                        </span>
-                        <span className="text-slate-500">回合 #{i+1}</span>
-                      </div>
-                      <h4 className="text-xs font-bold text-gray-200">
-                        議題「{h.scenarioTitle}」
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        顧問抉擇: <span className="text-amber-400 font-semibold">{h.chosenOptionId === "A" ? "A" : h.chosenOptionId === "B" ? "B" : "C"} - {h.chosenOptionTitle}</span>
+              {/* Tab Navigation */}
+              <div className="flex border-b border-slate-800/60 bg-[#080b13] px-6 gap-6 shrink-0">
+                <button
+                  onClick={() => setHistoryModalTab("current")}
+                  className={`py-3.5 text-xs font-bold tracking-widest uppercase border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                    historyModalTab === "current"
+                      ? "border-amber-500 text-amber-400"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <span>🏛️</span>
+                  <span>本局決策路徑 ({history.length})</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setHistoryModalTab("archive");
+                    fetchGameHistoryList();
+                  }}
+                  className={`py-3.5 text-xs font-bold tracking-widest uppercase border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                    historyModalTab === "archive"
+                      ? "border-amber-500 text-amber-400"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <span>🗄️</span>
+                  <span>全球戰略存檔庫 ({historyList.length})</span>
+                </button>
+              </div>
+
+              {/* List Container */}
+              <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-4 bg-[#0a0d16]/30">
+                {historyModalTab === "current" ? (
+                  history.length === 0 ? (
+                    <div className="py-16 text-center border border-dashed border-slate-800/80 rounded-2xl text-slate-400 flex flex-col items-center justify-center my-auto">
+                      <span className="text-3xl mb-3">📜</span>
+                      <p className="text-sm font-medium text-slate-300">暫無進行中的決策路徑</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                        請在白宮內閣戰略會議發出您的第一條政權抉擇指令後，此處將實時記存您的執政執筆錄。
                       </p>
-                      
-                      {/* Stats alterations diff log */}
-                      <div className="border-t border-slate-800/60 pt-2 grid grid-cols-6 gap-1 text-[10px] font-mono mt-1">
-                        <div>
-                          <span className="text-slate-500 block">經濟</span>
-                          <span className={h.statsAfter.economy >= h.statsBefore.economy ? "text-emerald-400" : "text-rose-450"}>
-                            {h.statsBefore.economy} → {h.statsAfter.economy} ({h.statsAfter.economy - h.statsBefore.economy >= 0 ? `+${h.statsAfter.economy - h.statsBefore.economy}` : h.statsAfter.economy - h.statsBefore.economy})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">軍事</span>
-                          <span className={h.statsAfter.military >= h.statsBefore.military ? "text-emerald-400" : "text-rose-450"}>
-                            {h.statsBefore.military} → {h.statsAfter.military} ({h.statsAfter.military - h.statsBefore.military >= 0 ? `+${h.statsAfter.military - h.statsBefore.military}` : h.statsAfter.military - h.statsBefore.military})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">外交</span>
-                          <span className={h.statsAfter.diplomacy >= h.statsBefore.diplomacy ? "text-emerald-400" : "text-rose-450"}>
-                            {h.statsBefore.diplomacy} → {h.statsAfter.diplomacy} ({h.statsAfter.diplomacy - h.statsBefore.diplomacy >= 0 ? `+${h.statsAfter.diplomacy - h.statsBefore.diplomacy}` : h.statsAfter.diplomacy - h.statsBefore.diplomacy})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">民意</span>
-                          <span className={h.statsAfter.publicOpinion >= h.statsBefore.publicOpinion ? "text-emerald-400" : "text-rose-450"}>
-                            {h.statsBefore.publicOpinion} → {h.statsAfter.publicOpinion} ({h.statsAfter.publicOpinion - h.statsBefore.publicOpinion >= 0 ? `+${h.statsAfter.publicOpinion - h.statsBefore.publicOpinion}` : h.statsAfter.publicOpinion - h.statsBefore.publicOpinion})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">產業</span>
-                          <span className={h.statsAfter.industry >= h.statsBefore.industry ? "text-emerald-400" : "text-rose-410"}>
-                            {h.statsBefore.industry} → {h.statsAfter.industry} ({h.statsAfter.industry - h.statsBefore.industry >= 0 ? `+${h.statsAfter.industry - h.statsBefore.industry}` : h.statsAfter.industry - h.statsBefore.industry})
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-500 block">關市</span>
-                          <span className={h.statsAfter.market >= h.statsBefore.market ? "text-emerald-400" : "text-rose-400"}>
-                            {h.statsBefore.market} → {h.statsAfter.market} ({h.statsAfter.market - h.statsBefore.market >= 0 ? `+${h.statsAfter.market - h.statsBefore.market}` : h.statsAfter.market - h.statsBefore.market})
-                          </span>
-                        </div>
-                      </div>
                     </div>
-                  ))
+                  ) : (
+                    <div className="flex flex-col gap-3.5 pr-1">
+                      {history.map((h, i) => (
+                        <div key={i} className="p-4 bg-slate-900/50 hover:bg-[#0f1322]/80 border border-slate-800/80 rounded-xl text-left flex flex-col gap-3 transition-colors shadow-sm relative group">
+                          <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-amber-500/40 rounded-l-xl group-hover:bg-amber-500 transition-colors" />
+                          <div className="flex items-center justify-between text-xs font-mono ml-1">
+                            <span className="text-amber-500 font-bold flex items-center gap-1.5">
+                              <span>📅</span> 第 {h.daysOfPresidency} 天 ({h.dateString})
+                            </span>
+                            <span className="text-slate-500 bg-slate-800/50 px-2.5 py-0.5 rounded-full border border-slate-700/30">回合 #{i+1}</span>
+                          </div>
+                          
+                          <div className="ml-1">
+                            <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                              議題「{h.scenarioTitle}」
+                            </h4>
+                            <p className="text-xs text-slate-400 mt-1.5">
+                              執政指令: <span className="text-amber-400 font-bold">{h.chosenOptionId === "A" ? "A" : h.chosenOptionId === "B" ? "B" : "C"} - {h.chosenOptionTitle}</span>
+                            </p>
+                          </div>
+                          
+                          {/* Stats alterations diff log */}
+                          <div className="border-t border-slate-850 pt-2.5 grid grid-cols-6 gap-1 text-[11px] font-mono mt-1 background-slate-950/60 p-2.5 rounded-lg ml-1">
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">經濟</span>
+                              <span className={h.statsAfter.economy >= h.statsBefore.economy ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.economy} → {h.statsAfter.economy} ({h.statsAfter.economy - h.statsBefore.economy >= 0 ? `+${h.statsAfter.economy - h.statsBefore.economy}` : h.statsAfter.economy - h.statsBefore.economy})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">軍事</span>
+                              <span className={h.statsAfter.military >= h.statsBefore.military ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.military} → {h.statsAfter.military} ({h.statsAfter.military - h.statsBefore.military >= 0 ? `+${h.statsAfter.military - h.statsBefore.military}` : h.statsAfter.military - h.statsBefore.military})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">外交</span>
+                              <span className={h.statsAfter.diplomacy >= h.statsBefore.diplomacy ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.diplomacy} → {h.statsAfter.diplomacy} ({h.statsAfter.diplomacy - h.statsBefore.diplomacy >= 0 ? `+${h.statsAfter.diplomacy - h.statsBefore.diplomacy}` : h.statsAfter.diplomacy - h.statsBefore.diplomacy})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">民意</span>
+                              <span className={h.statsAfter.publicOpinion >= h.statsBefore.publicOpinion ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.publicOpinion} → {h.statsAfter.publicOpinion} ({h.statsAfter.publicOpinion - h.statsBefore.publicOpinion >= 0 ? `+${h.statsAfter.publicOpinion - h.statsBefore.publicOpinion}` : h.statsAfter.publicOpinion - h.statsBefore.publicOpinion})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">監控</span>
+                              <span className={h.statsAfter.industry >= h.statsBefore.industry ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.industry} → {h.statsAfter.industry} ({h.statsAfter.industry - h.statsBefore.industry >= 0 ? `+${h.statsAfter.industry - h.statsBefore.industry}` : h.statsAfter.industry - h.statsBefore.industry})
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">股市</span>
+                              <span className={h.statsAfter.market >= h.statsBefore.market ? "text-emerald-400" : "text-rose-400"}>
+                                {h.statsBefore.market} → {h.statsAfter.market} ({h.statsAfter.market - h.statsBefore.market >= 0 ? `+${h.statsAfter.market - h.statsBefore.market}` : h.statsAfter.market - h.statsBefore.market})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  /* Archive completed history list */
+                  isHistoryLoading ? (
+                    <div className="py-20 text-center my-auto flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
+                      <p className="text-sm text-slate-400 font-medium">正在自白宮終端安全雲下載存檔庫...</p>
+                    </div>
+                  ) : historyList.length === 0 ? (
+                    <div className="py-16 text-center border border-dashed border-slate-800/80 rounded-2xl text-slate-400 flex flex-col items-center justify-center my-auto">
+                      <span className="text-3xl mb-3">🗄️</span>
+                      <p className="text-sm font-medium text-slate-300">全球戰略存檔庫為空</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                        當您在遊戲中達成任何完結結局（突破 15 回合、或屬性破產解雇）後，系統將安全同步每一場完整執政實錄至此處。
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4 pr-1">
+                      {historyList.map((item, index) => {
+                        const isExpanded = expandedArchiveGameId === item.gameId;
+                        
+                        // Rating color mapping
+                        let ratingColor = "text-blue-400 bg-blue-500/10 border-blue-500/30";
+                        if (item.rating === "S") ratingColor = "text-amber-400 bg-amber-500/10 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]";
+                        else if (item.rating === "A") ratingColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
+                        else if (item.rating === "C") ratingColor = "text-purple-400 bg-purple-500/10 border-purple-500/30";
+                        else if (item.rating === "D") ratingColor = "text-rose-450 bg-rose-500/10 border-rose-500/30";
+
+                        const gameStartTime = item.createdAt ? new Date(item.createdAt).toLocaleString('zh-TW', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : "未知時間";
+
+                        return (
+                          <div
+                            key={item.gameId || index}
+                            className={`p-4 bg-slate-900/40 border border-slate-800/80 rounded-xl text-left flex flex-col gap-3 transition-all ${
+                              isExpanded ? "ring-1 ring-amber-500/20 bg-slate-900/60" : "hover:bg-slate-900/50"
+                            }`}
+                          >
+                            {/* Collapsible Trigger Section */}
+                            <div
+                              onClick={() => setExpandedArchiveGameId(isExpanded ? null : item.gameId)}
+                              className="flex items-start justify-between cursor-pointer select-none"
+                            >
+                              <div className="flex-grow">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-slate-400 font-bold text-sm tracking-wide">
+                                    {item.endingName || "綜合執政評定"}
+                                  </span>
+                                  <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${ratingColor}`}>
+                                    等級 {item.rating}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] font-mono text-slate-500 mt-1">
+                                  📊 總戰略得分：{item.totalScore} 分 | 記錄時間：{gameStartTime}
+                                </p>
+                              </div>
+                              <span className="text-slate-500 group-hover:text-slate-300 text-xs mt-1">
+                                {isExpanded ? "收合細節 ▲" : "展開細節 ▼"}
+                              </span>
+                            </div>
+
+                            {/* Minified Stats Indicator Row */}
+                            <div className="grid grid-cols-6 gap-2 bg-[#090d16]/75 p-2 rounded-lg border border-slate-850/60 text-[10px] font-mono">
+                              <div><span className="text-slate-500 block">經濟</span><span className="text-slate-200">{item.finalStats?.economy ?? 50}%</span></div>
+                              <div><span className="text-slate-500 block">軍事</span><span className="text-slate-200">{item.finalStats?.military ?? 50}%</span></div>
+                              <div><span className="text-slate-500 block">外交</span><span className="text-slate-200">{item.finalStats?.diplomacy ?? 50}%</span></div>
+                              <div><span className="text-slate-500 block">民意</span><span className="text-slate-200">{item.finalStats?.publicOpinion ?? 50}%</span></div>
+                              <div><span className="text-slate-500 block">監控</span><span className="text-slate-200">{item.finalStats?.industry ?? 50}%</span></div>
+                              <div><span className="text-slate-500 block">股市</span><span className="text-slate-200">{item.finalStats?.market ?? 50}%</span></div>
+                            </div>
+
+                            {/* Expandable detailed review & decision log */}
+                            {isExpanded && (
+                              <div className="border-t border-slate-800/80 mt-2.5 pt-3 flex flex-col gap-3 font-sans animate-fade-in">
+                                
+                                {/* AI Historic Evaluation Column */}
+                                {item.aiHistoricalReview && (
+                                  <div className="p-3 bg-[#080c14] border border-slate-800/60 rounded-lg text-xs leading-relaxed text-slate-300">
+                                    <div className="text-[11px] font-bold text-amber-500/80 mb-1.5 flex items-center gap-1">
+                                      <span>🤖</span> AI 戰略內閣歷史評論：
+                                    </div>
+                                    <p className="italic font-mono font-medium text-slate-400 select-text leading-relaxed whitespace-pre-wrap">
+                                      「{item.aiHistoricalReview}」
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Complete sequence of selected choices */}
+                                {item.decisions && item.decisions.length > 0 && (
+                                  <div className="space-y-2 mt-1">
+                                    <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1 mb-2">
+                                      <span>📋</span> 歷次回合決策履歷：
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pl-1 pr-2 custom-scrollbar">
+                                      {item.decisions.map((dec: any, decIdx: number) => (
+                                        <div key={decIdx} className="flex gap-2 items-start text-xs border-l-[2px] border-slate-800 pl-2 py-0.5">
+                                          <span className="text-[10px] font-mono text-amber-500 font-bold shrink-0 mt-0.5">
+                                            [R#{dec.round}]
+                                          </span>
+                                          <div className="flex-1 min-w-0">
+                                            <span className="text-slate-300 font-medium text-[11px]">議題: {dec.scenarioTitle}</span>
+                                            <span className="block text-[11px] text-[#F5A623] mt-0.5 font-bold">抉擇: ({dec.chosenOptionId}) {dec.chosenOptionTitle}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
 
               {/* Actions */}
-              <div className="px-6 py-4 border-t border-slate-800 bg-[#0f1424] flex justify-end">
+              <div className="px-6 py-4 border-t border-slate-800/80 bg-[#0e1220] flex justify-end shrink-0">
                 <button
                   onClick={() => setIsHistoryModalOpen(false)}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-xl transition cursor-pointer"
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs rounded-xl transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shadow-[0_4px_12px_rgba(245,158,11,0.25)]"
                 >
                   確認關閉
                 </button>
