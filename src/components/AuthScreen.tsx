@@ -78,11 +78,13 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       const res = await signUp(email, password);
-      if (res.success && res.unverified) {
+      if (res.success && res.loggedIn) {
+        setSuccess("帳號建立成功！正在登入...");
+      } else if (res.success && res.unverified) {
         setSuccess(res.info || `認證碼已成功寄送至：${email}，請至信箱收取。`);
         setView("otp");
       } else {
-        setError(res.error || "發送驗證碼失敗，請重試。");
+        setError(res.error || "註冊失敗，請重試。");
       }
     } catch (err: any) {
       setError("註冊流程出錯，請確認格式或重試。");
@@ -256,7 +258,7 @@ export default function AuthScreen() {
                 }}
                 className="text-xs text-amber-500/80 hover:text-amber-400 font-medium hover:underline cursor-pointer bg-transparent border-none outline-none"
               >
-                尚未取得決策權限？ 註冊新參謀 (需寄送郵件驗證碼)
+                尚未取得決策權限？ 註冊新參謀
               </button>
             </div>
           </form>
@@ -317,7 +319,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>傳送 6 位數驗證碼</span>
+                  <span>確認註冊並啟用帳號</span>
                 </>
               )}
             </button>

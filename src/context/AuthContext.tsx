@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Custom Sign Up with Email + Password + verification code
+  // Custom Sign Up with Email + Password (Direct register & Login - OTP flow is bypassed but retained in comments)
   const signUp = async (emailInput: string, passwordInput: string) => {
     const email = emailInput.trim().toLowerCase();
     
@@ -170,9 +170,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (isPlaceholderFirebase) {
         if (localUsers[email] && localUsers[email].verified) {
-          return { success: false, error: "此信箱已被註冊且已驗證。" };
+          return { success: false, error: "此信箱已被註冊。" };
         }
         
+        // Directly register as verified
+        localUsers[email] = {
+          email,
+          password: passwordInput,
+          verified: true,
+          verificationCode: "", // bypass OTP
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem("chronos_local_users", JSON.stringify(localUsers));
+
+        // Directly log in the user offline
+        const loggedUser: CustomUser = {
+          uid: `local_${new Date().getTime()}`,
+          email: email,
+          verified: true
+        };
+        setUser(loggedUser);
+        localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
+        
+        return { success: true, loggedIn: true };
+
+        /* ── [OLD KEY-VAL OTP FLOW PRESERVED BELOW FOR FUTURE RESEND RE-ACTIVATION] ──
         const otpCode = "123456"; // Default/Fallback OTP during offline/unconfigured mode
         
         localUsers[email] = {
@@ -204,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           unverified: true, 
           info: "已啟用本地註冊！請輸入預設測試驗證碼「123456」以完成驗證。" 
         };
+        */
       }
 
       // ── NORMAL FIREBASE WORKFLOW ──
@@ -218,16 +241,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (firestoreErr) {
         // Fallback to local storage if Firestore throws error (e.g. offline)
         if (localUsers[email] && localUsers[email].verified) {
-          return { success: false, error: "此信箱已被註冊且已驗證。" };
+          return { success: false, error: "此信箱已被註冊。" };
         }
         userDocExists = !!localUsers[email];
         existingData = localUsers[email];
       }
       
       if (userDocExists && existingData?.verified) {
-        return { success: false, error: "此信箱已被註冊且已驗證。" };
+        return { success: false, error: "此信箱已被註冊。" };
       }
 
+      // Save/Update in Local Storage as verified directly
+      localUsers[email] = {
+        email,
+        password: passwordInput,
+        verified: true,
+        verificationCode: "",
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem("chronos_local_users", JSON.stringify(localUsers));
+
+      // Try writing to Firestore with verified: true
+      try {
+        const userRef = doc(db, "chronos_users", email);
+        await setDoc(userRef, {
+          email,
+          password: passwordInput,
+          verified: true,
+          verificationCode: "",
+          createdAt: new Date().toISOString()
+        });
+      } catch (firestoreWriteErr) {
+        console.log("Firestore write failed during signUp (offline fallback used):", firestoreWriteErr);
+      }
+
+      // Automatically log in the user
+      const loggedUser: CustomUser = {
+        uid: `custom_${new Date().getTime()}`,
+        email: email,
+        verified: true
+      };
+      setUser(loggedUser);
+      localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
+
+      return { success: true, loggedIn: true };
+
+      /* ── [OLD FIREBASE OTP SMTP FLOW PRESERVED BELOW FOR FUTURE RESEND RE-ACTIVATION] ──
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
       // Save/Update in Local Storage as fallback
@@ -281,9 +340,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       return { success: true, unverified: true };
+      */
     } catch (err: any) {
       console.log("Sign Up error (handled):", err);
-      return { success: false, error: err.message || "註冊驗件寄送程序失敗。" };
+      return { success: false, error: err.message || "註冊建立程序失敗。" };
     }
   };
 
@@ -395,7 +455,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { success: false, error: "密碼或信箱錯誤，請重新再試。" };
         }
         if (!localUserData.verified) {
-          return { success: false, error: "該帳號尚未驗證，請重新註冊以獲取驗證碼。" };
+          return { success: false, error: "該帳號尚未啟用，請重新註冊或聯絡管理員。" };
         }
 
         const loggedUser: CustomUser = {
@@ -435,7 +495,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!activeData.verified) {
-        return { success: false, error: "該帳號尚未驗證，請重新註冊以獲取驗證碼。" };
+        return { success: false, error: "該帳號尚未啟用，請重新註冊或聯絡管理員。" };
       }
 
       const loggedUser: CustomUser = {
