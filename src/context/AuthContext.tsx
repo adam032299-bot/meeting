@@ -160,6 +160,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Synchronize registered user to Google Sheets via Google Apps Script Web App
+  const syncUserToGoogleSheet = async (
+    userIdOrObj: string | { userId: string; email: string; registrationType: string },
+    emailParam?: string,
+    registrationTypeParam?: string
+  ) => {
+    console.log("同步函數已啟動");
+
+    let userId: string;
+    let email: string;
+    let registrationType: string;
+
+    if (typeof userIdOrObj === "object" && userIdOrObj !== null) {
+      userId = userIdOrObj.userId;
+      email = userIdOrObj.email;
+      registrationType = userIdOrObj.registrationType;
+    } else {
+      userId = userIdOrObj as string;
+      email = emailParam || "";
+      registrationType = registrationTypeParam || "email";
+    }
+
+    console.log("SYNC FUNCTION STARTED", { userId, email, registrationType });
+    
+    // Retrieve environment variable configuration, filtering out the malformed/mangled string if injected by cache or process
+    const rawEnvUrl = (((import.meta as any).env?.VITE_GAS_API_URL) || "").trim();
+    const GAS_API_URL = (rawEnvUrl && rawEnvUrl.startsWith("https://") && !rawEnvUrl.includes("exeuTzys"))
+      ? rawEnvUrl
+      : "https://script.google.com/macros/s/AKfycbx4NchHRT5L3TJlrFkHLgq5U9vnkVMho0QZiZnXuTzysFttUvHtQSCOoXhLgrC6U1W1xw/exec";
+    
+    console.log("1. Targeting GAS URL:", GAS_API_URL);
+    console.log("2. Ends with /exec:", GAS_API_URL.endsWith("/exec") || GAS_API_URL.includes("/exec"));
+    console.log("3. HTTP Method: POST");
+
+    const requestBody = {
+      secretToken: "CHRONOS_SUPER_SECRET_TOKEN_2026",
+      action: "syncUser",
+      data: {
+        userId,
+        email,
+        registrationType
+      }
+    };
+
+    console.log("4. Request Payload (Body):", JSON.stringify(requestBody, null, 2));
+
+    try {
+      console.log("FETCH START");
+      const response = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain" // Prevents preflight request failure on Apps Script
+        },
+        body: JSON.stringify(requestBody)
+      });
+      console.log("FETCH END");
+
+      console.log("=== [GAS] Direct Response Details ===");
+      console.log("Response Redirected:", response.redirected);
+      console.log("Response Status Code:", response.status);
+      console.log("Response Status OK:", response.ok);
+
+      try {
+        const text = await response.text();
+        console.log("5. RAW Response Body (Text):", text);
+      } catch (readErr) {
+        console.log("Could not read response text body:", readErr);
+      }
+    } catch (error) {
+      console.warn("=== [GAS] Direct CORS/Network Error. Fallback to no-cors mode ===", error);
+      
+      try {
+        console.log("FETCH START (Fallback)");
+        await fetch(GAS_API_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body: JSON.stringify(requestBody)
+        });
+        console.log("FETCH END (Fallback)");
+        console.log("6. Fallback request sent successfully in opaque (no-cors) mode.");
+      } catch (retryErr) {
+        console.error("Fallback sync attempt also failed:", retryErr);
+      }
+    }
+  };
+
   // Custom Sign Up with Email + Password (Direct register & Login - OTP flow is bypassed but retained in comments)
   const signUp = async (emailInput: string, passwordInput: string) => {
     const email = emailInput.trim().toLowerCase();
@@ -189,6 +278,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: email,
           verified: true
         };
+
+        // Trigger Google Apps Script Sync BEFORE logging in / showing main dashboard
+        try {
+          await syncUserToGoogleSheet({
+            userId: loggedUser.uid || email,
+            email: email,
+            registrationType: "email"
+          });
+        } catch (syncErr) {
+          console.error("Google Apps Script registration sync failed:", syncErr);
+        }
+        
         setUser(loggedUser);
         localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
         
@@ -281,6 +382,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email,
         verified: true
       };
+
+      // Trigger Google Apps Script Sync BEFORE logging in / showing main dashboard
+      try {
+        await syncUserToGoogleSheet({
+          userId: loggedUser.uid || email,
+          email: email,
+          registrationType: "email"
+        });
+      } catch (syncErr) {
+        console.error("Google Apps Script registration sync failed:", syncErr);
+      }
+
       setUser(loggedUser);
       localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
 
@@ -373,6 +486,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           verified: true
         };
 
+        try {
+          await syncUserToGoogleSheet({
+            userId: loggedUser.uid || email,
+            email: email,
+            registrationType: "email"
+          });
+        } catch (syncErr) {
+          console.error("Google Apps Script verification sync failed:", syncErr);
+        }
+
         setUser(loggedUser);
         localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
 
@@ -429,6 +552,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: activeData.email,
         verified: true
       };
+
+      try {
+        await syncUserToGoogleSheet({
+          userId: loggedUser.uid || email,
+          email: email,
+          registrationType: "email"
+        });
+      } catch (syncErr) {
+        console.error("Google Apps Script verification sync failed:", syncErr);
+      }
 
       setUser(loggedUser);
       localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
