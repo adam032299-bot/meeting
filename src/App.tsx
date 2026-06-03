@@ -3185,168 +3185,214 @@ export default function App() {
                   ) : showResultPanel && lastSelectedChoice && lastImpacts ? (
                     <motion.div
                       id="results-panel-overlay"
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.98 }}
-                      className="py-4 px-2 flex flex-col items-center justify-center text-center gap-5 bg-[#0f1424]/60 border border-amber-500/20 rounded-xl shadow-2xl leading-relaxed"
+                      className="w-full max-w-7xl mx-auto flex flex-col gap-6 md:gap-8 lg:p-4 pb-10"
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase font-bold flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-400" />
-                          DECISION OUTCOME EVALUATION • 決策影響結算
-                        </span>
-                        <div className="text-sm font-semibold text-gray-200">
-                          已執行：{lastSelectedChoice.id === "A" ? "【選項 A】" : lastSelectedChoice.id === "B" ? "【選項 B】" : "【選項 C】"}{" "}
-                          <span className="text-amber-400 font-extrabold">{lastSelectedChoice.title}</span>
-                        </div>
-                      </div>
-
-                      {/* Displaying Turn's changes */}
-                      <div className="w-full max-w-lg bg-slate-950/80 border border-slate-800/80 rounded-xl p-5 flex flex-col gap-4">
-                        <h4 className="text-xs font-bold text-slate-300 border-b border-slate-800 pb-2 mb-1 flex items-center justify-center gap-1.5 font-mono uppercase tracking-wider">
-                          📋 本回合指標變化 (This Turn's Changes)
-                        </h4>
+                      <div className="flex flex-col lg:flex-row gap-6 w-full items-stretch">
                         
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Economy */}
-                          <div id="result-stat-economy" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">經濟 (Economy)</span>
-                            <span className={`font-mono font-bold text-sm ${lastImpacts.economy > 0 ? "text-emerald-400" : lastImpacts.economy < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {lastImpacts.economy > 0 ? `+${lastImpacts.economy}` : lastImpacts.economy === 0 ? "0" : lastImpacts.economy}
-                            </span>
+                        {/* 左側：本回合分析 (Left Panel: Turn Analytics) */}
+                        <div className="w-full lg:w-[35%] flex flex-col gap-4 relative z-10 shrink-0">
+                          {/* Info Header */}
+                          <div className="flex flex-col gap-2 mb-2">
+                            <div className="text-[10px] md:text-xs font-mono tracking-widest text-amber-500 uppercase font-bold flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 animate-pulse text-amber-400" />
+                              DECISION OUTCOME EVALUATION
+                            </div>
+                            <div className="text-sm md:text-base font-semibold text-gray-200 bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 backdrop-blur-md shadow-inner text-left">
+                              <span className="text-slate-400 font-normal mr-2">已執行：</span>
+                              {lastSelectedChoice.id === "A" ? "【選項 A】" : lastSelectedChoice.id === "B" ? "【選項 B】" : "【選項 C】"}{" "}
+                              <span className="text-amber-400 font-extrabold">{lastSelectedChoice.title}</span>
+                            </div>
                           </div>
 
-                          {/* Military */}
-                          <div id="result-stat-military" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">軍事 (Military)</span>
-                            <span className={`font-mono font-bold text-sm ${lastImpacts.military > 0 ? "text-emerald-400" : lastImpacts.military < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {lastImpacts.military > 0 ? `+${lastImpacts.military}` : lastImpacts.military === 0 ? "0" : lastImpacts.military}
-                            </span>
-                          </div>
+                          <h4 className="text-sm md:text-base font-bold text-slate-300 flex items-center gap-2 font-mono uppercase tracking-wider mb-2">
+                            <Activity className="w-4 h-4 text-cyan-400" /> 本回合影響分析
+                          </h4>
 
-                          {/* Diplomacy */}
-                          <div id="result-stat-diplomacy" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">外交 (Diplomacy)</span>
-                            <span className={`font-mono font-bold text-sm ${lastImpacts.diplomacy > 0 ? "text-emerald-400" : lastImpacts.diplomacy < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {lastImpacts.diplomacy > 0 ? `+${lastImpacts.diplomacy}` : lastImpacts.diplomacy === 0 ? "0" : lastImpacts.diplomacy}
-                            </span>
-                          </div>
-
-                          {/* Approval */}
-                          <div id="result-stat-approval" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">民意 (Approval)</span>
-                            <span className={`font-mono font-bold text-sm ${(lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) > 0 ? "text-emerald-400" : (lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {(lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) > 0 ? `+${lastImpacts.publicOpinion ?? lastImpacts.approval}` : (lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) === 0 ? "0" : (lastImpacts.publicOpinion ?? lastImpacts.approval)}
-                            </span>
-                          </div>
-
-                          {/* Industry */}
-                          <div id="result-stat-industry" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">產業 (Industry)</span>
-                            <span className={`font-mono font-bold text-sm ${lastImpacts.industry > 0 ? "text-emerald-400" : lastImpacts.industry < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {lastImpacts.industry > 0 ? `+${lastImpacts.industry}` : lastImpacts.industry === 0 ? "0" : lastImpacts.industry}
-                            </span>
-                          </div>
-
-                          {/* StockMarket */}
-                          <div id="result-stat-stockmarket" className="flex items-center justify-between text-xs px-3 py-2 bg-[#121625] border border-slate-800/60 rounded-lg">
-                            <span className="text-slate-400 font-medium">關市 (StockMarket)</span>
-                            <span className={`font-mono font-bold text-sm ${(lastImpacts.market ?? lastImpacts.stockMarket ?? 0) > 0 ? "text-emerald-400" : (lastImpacts.market ?? lastImpacts.stockMarket ?? 0) < 0 ? "text-rose-400" : "text-gray-500"}`}>
-                              {(lastImpacts.market ?? lastImpacts.stockMarket ?? 0) > 0 ? `+${lastImpacts.market ?? lastImpacts.stockMarket}` : (lastImpacts.market ?? lastImpacts.stockMarket ?? 0) === 0 ? "0" : (lastImpacts.market ?? lastImpacts.stockMarket)}
-                            </span>
+                          <div className="grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3 md:gap-4 text-left">
+                            {[
+                              { key: 'economy', bgIcon: <Coins className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '經濟 (Economy)', val: lastImpacts.economy, type: 'economy' },
+                              { key: 'military', bgIcon: <Shield className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '軍事 (Military)', val: lastImpacts.military, type: 'military' },
+                              { key: 'diplomacy', bgIcon: <Globe className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '外交 (Diplomacy)', val: lastImpacts.diplomacy, type: 'diplomacy' },
+                              { key: 'publicOpinion', bgIcon: <Users className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '民意 (Approval)', val: lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0, type: 'publicOpinion' },
+                              { key: 'industry', bgIcon: <Factory className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '產業 (Industry)', val: lastImpacts.industry, type: 'industry' },
+                              { key: 'stockMarket', bgIcon: <TrendingUp className="w-12 h-12 md:w-16 md:h-16 opacity-20" />, name: '股市 (Stock Market)', val: lastImpacts.market ?? lastImpacts.stockMarket ?? 0, type: 'stockMarket' },
+                            ].map((stat, i) => {
+                              const isPos = stat.val > 0;
+                              const isNeg = stat.val < 0;
+                              const isZero = stat.val === 0;
+                              return (
+                                <div 
+                                  key={stat.key}
+                                  className={`relative overflow-hidden flex flex-col p-4 md:p-5 rounded-xl border backdrop-blur-md shadow-2xl transition-all hover:scale-[1.02] cursor-default
+                                    ${isPos ? "bg-emerald-950/40 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)]" : 
+                                      isNeg ? "bg-rose-950/40 border-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.15)]" : 
+                                      "bg-slate-900/60 border-slate-700/50"}
+                                  `}
+                                >
+                                  {/* Background Icon */}
+                                  <div className={`absolute -bottom-2 -right-2 transition-transform duration-500 ${isPos?"text-emerald-500 group-hover:scale-110":isNeg?"text-rose-500 group-hover:scale-110":"text-slate-500"}`}>
+                                    {stat.bgIcon}
+                                  </div>
+                                  <span className="text-xs md:text-sm text-slate-400 font-bold font-sans z-10 mb-1 md:mb-2 uppercase tracking-wide">{stat.name}</span>
+                                  <div className="flex items-baseline gap-2 z-10">
+                                    <span className={`text-3xl md:text-5xl font-mono font-black tracking-tighter ${isPos?"text-emerald-400":isNeg?"text-rose-400":"text-gray-400"}`}>
+                                      {isPos ? `+${stat.val}` : isZero ? "0" : stat.val}
+                                    </span>
+                                    <span className={`text-xs md:text-sm font-bold ${isPos?"text-emerald-500":isNeg?"text-rose-500":"text-gray-500"}`}>
+                                      {isPos ? "↗ 正向" : isNeg ? "↘ 負向" : "→ 無變"}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
 
-                      {/* AI 新聞面板 (AI News Panel) */}
-                      <div id="ai-news-panel" className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl flex flex-col text-left">
-                        {/* Red Ticker Head */}
-                        <div className="bg-gradient-to-r from-red-800 via-red-650 to-amber-700 px-4 py-2 flex items-center justify-between text-white border-b border-red-900/30">
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-2 w-2 relative">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                            </span>
-                            <span className="text-[10px] font-mono font-bold tracking-widest uppercase flex items-center gap-1.5 animate-pulse">
-                              <Globe className="w-3.5 h-3.5 text-white animate-spin-slow" />
-                              AI REAL-TIME FEED • 全球即時電訊
-                            </span>
+                        {/* 右側：AI 新聞中心 (Right Panel: AI News Feed) */}
+                        <div className="w-full lg:w-[65%] flex flex-col min-h-[500px] h-full bg-[#050914] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden relative isolate">
+                          {/* Map background placeholder grid */}
+                          <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-screen" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #475569 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+                          <div className="absolute top-10 right-10 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+                          <div className="absolute bottom-10 left-10 w-96 h-96 bg-red-600/10 rounded-full blur-[120px] pointer-events-none" />
+                          
+                          {/* Feed Header */}
+                          <div className="bg-gradient-to-r from-red-900 via-red-800 to-red-950 border-b-4 border-red-950 px-5 md:px-6 py-3 md:py-4 flex justify-between items-center z-10 relative shadow-md">
+                            <div className="flex items-center gap-3 md:gap-4">
+                              <div className="flex h-3 md:h-4 w-3 md:w-4 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-300 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-3 md:h-4 w-3 md:w-4 bg-white" />
+                              </div>
+                              <span className="text-white font-black tracking-[0.2em] md:tracking-[0.3em] text-lg md:text-2xl font-mono uppercase">
+                                AI REAL-TIME FEED
+                              </span>
+                            </div>
+                            <div className="hidden sm:flex items-center gap-2 text-red-200 text-xs md:text-sm font-mono font-bold tracking-wider opacity-90 bg-black/30 px-3 py-1 rounded shadow-inner">
+                              <span>GSA-NET // GLOBAL LIVE</span>
+                            </div>
                           </div>
-                          <span className="text-[9px] font-mono text-red-100 bg-red-900/55 border border-red-400/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
-                            CNN / Reuters STYLE
-                          </span>
-                        </div>
 
-                        <div className="p-4 md:p-5 flex flex-col gap-4">
-                          {generatedNews ? (
-                            <>
-                              {/* News Headline */}
-                              <div className="border-b border-slate-800/80 pb-3">
-                                <h4 id="news-headline" className="text-sm md:text-base font-bold text-red-400 tracking-wide leading-snug">
-                                  {generatedNews.headline}
-                                </h4>
-                              </div>
-
-                              {/* News Content */}
-                              <div>
-                                <p id="news-content" className="text-xs text-slate-350 leading-relaxed font-sans">
-                                  {generatedNews.content}
-                                </p>
-                              </div>
-
-                              {/* Reactions Grid */}
-                              <div className="grid grid-cols-1 gap-2 border-t border-slate-800/60 pt-3">
-                                <div className="text-[10px] font-mono tracking-widest text-[#94a3b8] uppercase font-bold text-center md:text-left">
-                                  各方輿論與實時反應
+                          <div className="p-5 md:p-8 flex flex-col flex-grow z-10 gap-6 md:gap-8 justify-center text-left">
+                            {generatedNews ? (
+                              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col h-full gap-6 md:gap-8">
+                                {/* Headline */}
+                                <div className="border-l-[6px] md:border-l-8 border-red-500 pl-4 md:pl-6 py-1 md:py-2">
+                                  <h2 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-white leading-[1.2] md:leading-[1.15] tracking-tight shadow-sm font-serif">
+                                    {generatedNews.headline}
+                                  </h2>
                                 </div>
                                 
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div id="news-intl-reaction" className="p-2 bg-slate-950/60 border border-slate-850 rounded-lg flex flex-col gap-1 text-center md:text-left">
-                                    <span className="text-[9px] font-bold text-blue-400 font-sans uppercase">🌍 國際反應</span>
-                                    <span className="text-[10px] text-slate-300 leading-normal">{generatedNews.internationalReaction}</span>
+                                {/* Content */}
+                                <div className="bg-slate-900/60 p-5 md:p-8 rounded-xl md:rounded-2xl border border-slate-800/80 shadow-inner backdrop-blur-md flex-grow relative overflow-hidden">
+                                  {/* Watermark in background */}
+                                  <Globe className="absolute -right-10 -bottom-10 w-64 h-64 text-slate-800/30 -rotate-12 pointer-events-none" />
+                                  <p className="text-base md:text-xl lg:text-2xl text-slate-200 leading-[1.8] font-sans relative z-10">
+                                    <span className="float-left text-6xl md:text-8xl font-black text-red-500 font-serif mr-4 md:mr-5 leading-[0.8] mt-2 mb-2 drop-shadow-md">
+                                      {generatedNews.content.charAt(0)}
+                                    </span>
+                                    {generatedNews.content.slice(1)}
+                                  </p>
+                                </div>
+
+                                {/* Reactions Grid */}
+                                <div className="mt-auto grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-4 md:pt-6 border-t border-slate-800/80">
+                                  
+                                  {/* Intl */}
+                                  <div className="bg-[#0f172a]/80 border border-blue-500/30 rounded-xl p-4 md:p-5 flex flex-col justify-between gap-3 shadow-[0_4px_30px_rgba(59,130,246,0.1)] transition-transform hover:-translate-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs md:text-sm font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5"><Globe className="w-4 h-4 md:w-5 md:h-5" /> 國際反應</span>
+                                      {/* Mini circle chart */}
+                                      <div className="w-6 h-6 md:w-8 md:h-8 rounded-full border-[3px] border-blue-900/50 border-t-blue-400 animate-[spin_8s_linear_infinite] shadow-[0_0_10px_rgba(96,165,250,0.3)]" />
+                                    </div>
+                                    <p className="text-sm md:text-base text-slate-300 font-medium leading-relaxed mt-2">
+                                      {generatedNews.internationalReaction}
+                                    </p>
                                   </div>
-                                  <div id="news-market-reaction" className="p-2 bg-slate-950/60 border border-slate-850 rounded-lg flex flex-col gap-1 text-center md:text-left">
-                                    <span className="text-[9px] font-bold text-emerald-400 font-sans uppercase">📈 股市反應</span>
-                                    <span className="text-[10px] text-slate-300 leading-normal">{generatedNews.marketReaction}</span>
+
+                                  {/* Market */}
+                                  <div className="bg-[#0f172a]/80 border border-emerald-500/30 rounded-xl p-4 md:p-5 flex flex-col justify-between gap-3 shadow-[0_4px_30px_rgba(16,185,129,0.1)] transition-transform hover:-translate-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs md:text-sm font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5"><TrendingUp className="w-4 h-4 md:w-5 md:h-5" /> 股市反應</span>
+                                      {/* Mini line chart */}
+                                      <div className="flex items-end gap-1 md:gap-1.5 h-6 md:h-8">
+                                        <div className="w-1.5 md:w-2 h-[30%] bg-emerald-600/50 rounded-sm" />
+                                        <div className="w-1.5 md:w-2 h-[60%] bg-emerald-500/70 rounded-sm" />
+                                        <div className="w-1.5 md:w-2 h-[45%] bg-emerald-400/80 rounded-sm" />
+                                        <div className="w-1.5 md:w-2 h-[90%] bg-emerald-400 rounded-sm shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                                      </div>
+                                    </div>
+                                    <p className="text-sm md:text-base text-slate-300 font-medium leading-relaxed mt-2">
+                                      {generatedNews.marketReaction}
+                                    </p>
                                   </div>
-                                  <div id="news-pub-reaction" className="p-2 bg-slate-950/60 border border-slate-850 rounded-lg flex flex-col gap-1 text-center md:text-left">
-                                    <span className="text-[9px] font-bold text-amber-400 font-sans uppercase">👥 民意反應</span>
-                                    <span className="text-[10px] text-slate-300 leading-normal">{generatedNews.publicReaction}</span>
+
+                                  {/* Public */}
+                                  <div className="bg-[#0f172a]/80 border border-amber-500/30 rounded-xl p-4 md:p-5 flex flex-col justify-between gap-3 shadow-[0_4px_30px_rgba(245,158,11,0.1)] transition-transform hover:-translate-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs md:text-sm font-bold text-amber-400 uppercase tracking-widest flex items-center gap-1.5"><Users className="w-4 h-4 md:w-5 md:h-5" /> 民意反應</span>
+                                      {/* Mini live indicator */}
+                                      <div className="flex items-center gap-1.5 bg-amber-900/40 border border-amber-500/30 px-2 py-1 rounded">
+                                        <span className="text-[10px] md:text-xs font-bold text-amber-500 tracking-wider">LIVE</span>
+                                        <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+                                      </div>
+                                    </div>
+                                    <p className="text-sm md:text-base text-slate-300 font-medium leading-relaxed mt-2">
+                                      {generatedNews.publicReaction}
+                                    </p>
+                                  </div>
+
+                                </div>
+                              </motion.div>
+                            ) : (
+                              <div className="flex-grow flex flex-col items-center justify-center gap-5 text-center py-20">
+                                <div className="relative w-20 h-20 md:w-28 md:h-28">
+                                  <div className="absolute inset-0 rounded-full border-t-[4px] border-red-600 animate-spin" />
+                                  <div className="absolute inset-2 rounded-full border-b-[4px] border-red-500/50 animate-spin-slow flex items-center justify-center">
+                                    <Globe className="w-8 h-8 md:w-12 md:h-12 text-red-500 animate-pulse" />
                                   </div>
                                 </div>
+                                <div className="flex flex-col gap-2">
+                                  <p className="text-xl md:text-3xl font-extrabold text-slate-100 mt-4 tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-300 to-amber-500 animate-pulse font-mono">
+                                    全球即時資訊網同步中...
+                                  </p>
+                                  <p className="text-xs md:text-sm text-slate-500 font-mono tracking-[0.2em]">ASSEMBLING WORLDWIDE INTELLIGENCE FEED</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* 超大型 NEXT TURN 按鈕 */}
+                      <div className="w-full mt-4 lg:mt-6">
+                        <button
+                          id="next-turn-btn"
+                          onClick={handleNextTurnClicked}
+                          disabled={!generatedNews}
+                          className={`w-full h-[75px] md:h-[100px] rounded-xl md:rounded-2xl font-black text-xl md:text-[32px] tracking-[0.2em] md:tracking-[0.4em] uppercase flex items-center justify-center gap-4 transition-all duration-300 relative overflow-hidden group ${
+                            generatedNews 
+                              ? "bg-gradient-to-r from-[#d97706] via-[#f59e0b] to-[#fbbf24] text-[#451a03] shadow-[0_0_50px_rgba(245,158,11,0.4)] hover:shadow-[0_0_80px_rgba(245,158,11,0.6)] hover:scale-[1.01] active:scale-[0.98] outline-none" 
+                              : "bg-slate-900 text-slate-600 cursor-not-allowed border-2 border-slate-800"
+                          }`}
+                        >
+                          {generatedNews ? (
+                            <>
+                              <span className="relative z-10 block mt-1 drop-shadow-sm">{turn >= 15 ? "查看最終結局 (View Final Ending)" : "下一回合 (Next Turn)"}</span>
+                              <ArrowRight className="w-8 h-8 md:w-12 md:h-12 relative z-10 group-hover:translate-x-4 transition-transform duration-300" />
+                              {/* Glare sweep effect */}
+                              <div className="absolute inset-0 w-full h-full">
+                                <div className="absolute top-0 bottom-0 left-[-100%] w-[50%] bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-12 group-hover:translate-x-[400%] transition-transform duration-1000 ease-in-out z-0" />
                               </div>
                             </>
                           ) : (
-                            <div className="py-6 flex flex-col items-center justify-center gap-3 text-center">
-                              <RefreshCw className="w-5 h-5 text-red-500 animate-spin" />
-                              <p className="text-xs font-mono text-red-400 font-semibold tracking-wider animate-pulse">
-                                📡 朝野情資與聯邦新聞網即時生成中...
-                              </p>
-                            </div>
+                            <span className="tracking-widest text-base md:text-2xl">WAITING FOR INTELLIGENCE...</span>
                           )}
-                        </div>
+                        </button>
                       </div>
 
-                      {/* Next Turn Button */}
-                      <button
-                        id="next-turn-btn"
-                        onClick={handleNextTurnClicked}
-                        disabled={!generatedNews}
-                        className={`w-full max-w-lg py-3 rounded-xl font-bold text-xs tracking-widest transition-all uppercase flex items-center justify-center gap-2 cursor-pointer ${
-                          generatedNews 
-                            ? "bg-amber-500 hover:bg-amber-400 text-black shadow-lg hover:shadow-amber-500/20 active:scale-95" 
-                            : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
-                        }`}
-                      >
-                        {generatedNews ? (
-                          <>
-                            <span>{turn >= 15 ? "查看最終結局 (View Final Ending)" : "下一回合 (Next Turn)"}</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        ) : (
-                          <span>等待新聞生成...</span>
-                        )}
-                      </button>
                     </motion.div>
                   ) : (
                     <>
