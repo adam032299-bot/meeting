@@ -98,23 +98,33 @@ async function generateContentWithRetry(client: GoogleGenAI, params: any, maxRet
                            errMsg.toLowerCase().includes("quota") || 
                            errMsg.toLowerCase().includes("limit");
 
+      const isUnavailable = errMsg.includes("503") || 
+                            errMsg.includes("UNAVAILABLE") || 
+                            errMsg.toLowerCase().includes("high demand") || 
+                            errMsg.toLowerCase().includes("temporary");
+
       if (isQuotaError) {
         console.log(`[Gemini Resiliency] Quota limit reached (429/RESOURCE_EXHAUSTED). Activating 120-second circuit breaker to seamlessly use high-fidelity offline modes.`);
         triggerGeminiCooldown(120); // cooldown for 120s
         throw new Error("QUOTA_LIMIT_REACHED");
       }
 
-      console.warn(`Gemini generation attempt ${attempt}/${maxRetries} failed with error: ${errMsg}`);
+      if (isUnavailable && attempt === maxRetries) {
+        console.log(`[Gemini Resiliency] Service temporarily unavailable (503/UNAVAILABLE). Activating 60-second circuit breaker to seamlessly use high-fidelity offline modes.`);
+        triggerGeminiCooldown(60); // cooldown for 60s
+      }
+
+      console.log(`[Gemini Resiliency Info] Gemini generation attempt ${attempt}/${maxRetries} original model returned state: ${errMsg}`);
       
       // If we observe a 503 / high demand / UNAVAILABLE error, immediately fallback to "gemini-3.1-flash-lite"
-      if (errMsg.includes("503") || errMsg.includes("UNAVAILABLE") || errMsg.includes("high demand")) {
+      if (isUnavailable) {
         console.log(`[Gemini Resiliency] Detected high demand on original model. Attempting immediate fallback to "gemini-3.1-flash-lite"...`);
         try {
           params.model = "gemini-3.1-flash-lite";
           const response = await client.models.generateContent(params);
           return response;
         } catch (fallbackErr: any) {
-          console.warn(`[Gemini Resiliency] Fallback to "gemini-3.1-flash-lite" also failed during attempt ${attempt}:`, fallbackErr?.message || fallbackErr);
+          console.log(`[Gemini Resiliency Info] Fallback to "gemini-3.1-flash-lite" also returned: ${fallbackErr?.message || fallbackErr}`);
         }
       }
 
@@ -132,7 +142,7 @@ async function generateContentWithRetry(client: GoogleGenAI, params: any, maxRet
     const response = await client.models.generateContent(params);
     return response;
   } catch (fallbackErr: any) {
-    console.warn("[Gemini Resiliency] Gemini backup model generateContent also failed:", fallbackErr?.message || fallbackErr);
+    console.log(`[Gemini Resiliency Info] Gemini backup model generateContent also returned: ${fallbackErr?.message || fallbackErr}`);
     throw lastError || fallbackErr;
   }
 }

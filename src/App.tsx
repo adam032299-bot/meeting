@@ -273,10 +273,19 @@ export default function App() {
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isLargeScreen, setIsLargeScreen] = useState<boolean>(true);
+  const [screenSize, setScreenSize] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
 
   useEffect(() => {
     const handleResize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024);
+      const width = window.innerWidth;
+      setIsLargeScreen(width >= 1024);
+      if (width >= 1024) {
+        setScreenSize('desktop');
+      } else if (width >= 768) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('mobile');
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -285,6 +294,7 @@ export default function App() {
 
   const [stats, setStats] = useState<GameStats>(DEFAULT_STATS);
   const [currentScenario, setCurrentScenario] = useState<Scenario | null>(null);
+  const [shuffledChoices, setShuffledChoices] = useState<any[]>([]);
   const [history, setHistory] = useState<DecisionHistoryItem[]>([]);
   const [turn, setTurn] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -710,6 +720,145 @@ export default function App() {
     { id: "init-5", time: "10:09", text: "日本擴大國防預算", category: "war" }
   ]);
 
+  // Fisher-Yates element shuffle helper
+  const shuffleChoicesArray = (choices: any[]) => {
+    if (choices.length <= 1) return [...choices];
+
+    let attempts = 0;
+    let arr = [...choices];
+
+    const isSameOrder = (a: any[], b: any[]) => {
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+      }
+      return true;
+    };
+
+    do {
+      arr = [...choices];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      attempts++;
+    } while (isSameOrder(choices, arr) && attempts < 10);
+
+    return arr;
+  };
+
+  // Check and generate dynamic option display title
+  const getOptionDisplayTitle = (opt: any): string => {
+    const isCategory = (str: string | undefined | null): boolean => {
+      if (!str) return false;
+      const s = str.trim();
+      const forbiddenCategories = [
+        "強勢主動對策",
+        "務實和緩磋商",
+        "多邊協調機制",
+        "強硬反制",
+        "談判協商",
+        "尋求盟友支持",
+        "簽署配額命令",
+        "豁免盟友關稅",
+        "全面推遲關稅",
+        "發出最後通牒",
+        "倡導軍工合資",
+        "召開特別首腦峰會",
+        "實施嚴格禁令",
+        "發放有限許可證",
+        "補助本土晶片廠",
+        "堅守預算到底",
+        "兩黨妥協折衷",
+        "宣佈緊急戰術授權",
+        "A", "B", "C", "選項A", "選項B", "選項C", "選項 A", "選項 B", "選項 C"
+      ];
+      return forbiddenCategories.some(cat => s === cat || s.includes(cat));
+    };
+
+    const generateShortTitle = (description: string | undefined | null): string => {
+      if (!description) return "政策法案";
+      const desc = description.trim().replace(/^[ ，。、！？]/g, "");
+      
+      if (desc.includes("關稅")) {
+        if (desc.includes("加徵") || desc.includes("提高")) return "調整進口關稅政策";
+        return "關稅談判與調整";
+      }
+      if (desc.includes("補貼") || desc.includes("補助")) {
+        return "實施本土產業補貼";
+      }
+      if (desc.includes("軍事") || desc.includes("駐軍") || desc.includes("防衛")) {
+        return "調整軍事部署與防務";
+      }
+      if (desc.includes("同盟") || desc.includes("盟友") || desc.includes("聯合")) {
+        return "多邊外交同盟協作";
+      }
+      if (desc.includes("制裁") || desc.includes("禁止") || desc.includes("禁令")) {
+        return "實施出口管制與制裁";
+      }
+      if (desc.includes("預算") || desc.includes("撥款")) {
+        return "國土與聯邦預算審查";
+      }
+      if (desc.includes("對話") || desc.includes("談判") || desc.includes("妥協")) {
+        return "和平外交談判磋商";
+      }
+
+      const parts = desc.split(/[，。、；]/);
+      for (const part of parts) {
+        const p = part.trim();
+        if (p.length >= 6 && p.length <= 16) {
+          return p;
+        }
+      }
+      
+      const truncateLen = 14;
+      return desc.length > truncateLen ? desc.substring(0, truncateLen) + "..." : desc;
+    };
+
+    if (opt.policyTitle && !isCategory(opt.policyTitle)) {
+      return opt.policyTitle;
+    }
+    if (opt.text && !isCategory(opt.text)) {
+      return opt.text;
+    }
+    if (opt.title && !isCategory(opt.title)) {
+      return opt.title;
+    }
+    return generateShortTitle(opt.description);
+  };
+
+  useEffect(() => {
+    if (currentScenario && currentScenario.options) {
+      const preShuffled = [...currentScenario.options];
+      const postShuffled = shuffleChoicesArray(preShuffled);
+      setShuffledChoices(postShuffled);
+
+      console.log("---- 決策洗牌診斷 ----");
+      console.log("目前回合：", turn);
+      console.log("目前事件：", currentScenario.title);
+      console.log("洗牌前順序：", preShuffled.map(o => o.title || o.policyTitle || o.text));
+      console.log("洗牌後順序：", postShuffled.map(o => o.title || o.policyTitle || o.text));
+    } else {
+      setShuffledChoices([]);
+    }
+  }, [currentScenario]);
+
+  // Option selection handler that meets requirements
+  const handleChoiceSelect = async (shuffledChoice: any) => {
+    console.log("---- 選擇與套用診斷 ----");
+    console.log("目前回合：", turn);
+    console.log("目前事件：", currentScenario?.title);
+    
+    const preShuffled = currentScenario?.options || [];
+    console.log("洗牌前順序：", preShuffled.map(o => o.title || o.policyTitle || o.text));
+    console.log("洗牌後順序：", shuffledChoices.map(o => o.title || o.policyTitle || o.text));
+    
+    const displayTitle = getOptionDisplayTitle(shuffledChoice);
+    console.log("玩家選擇：", displayTitle);
+    console.log("套用 effects：", shuffledChoice.impacts || shuffledChoice.effects);
+
+    await handleSelectOption(shuffledChoice.id, displayTitle, shuffledChoice.impacts);
+  };
+
   // Load starting scenario on mount
   useEffect(() => {
     if (user) {
@@ -1114,6 +1263,8 @@ export default function App() {
     setEmailDraftResult(null);
   };
 
+  const hideSidebarWidgetOnTablet = isSidebarCollapsed && screenSize === 'tablet';
+
   return (
     <div id="chronos-root" className="bg-[#080b11] text-gray-200 min-h-screen font-sans antialiased overflow-x-hidden selection:bg-amber-500 selection:text-black">
       
@@ -1121,8 +1272,463 @@ export default function App() {
       <div id="ambient-gold-glow" className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-amber-500/5 rounded-full blur-[100px] pointer-events-none" />
       <div id="ambient-blue-glow" className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* ── HEADER ── */}
-      <header id="chronos-header" className="px-6 py-4 bg-[#0a0d16]/90 border-b border-slate-800/60 sticky top-0 z-40 backdrop-blur-md flex items-center justify-between">
+      {screenSize === 'mobile' ? (
+        /* 📱 MOBILE RESPONSIVE SINGLE-COLUMN LAYOUT */
+        <div id="mobile-layout-flow" className="flex flex-col w-full min-h-screen pb-12 bg-[#080b11]">
+          {/* ── HEADER ── */}
+          <header id="chronos-header-mobile" className="px-4 py-3 bg-[#0a0d16]/90 border-b border-slate-800/60 sticky top-0 z-40 backdrop-blur-md flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 border border-amber-500/30 rounded-lg flex items-center justify-center p-1 bg-[#0f1424] text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                <Award className="w-full h-full text-amber-400 stroke-[1.5]" />
+              </div>
+              <div>
+                <h1 className="text-base font-black tracking-wider text-pulse-gold bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500 bg-clip-text text-transparent">
+                  CHRONOS
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400 max-w-[125px] truncate">
+                {user.email || "library992"}
+              </span>
+              <button
+                onClick={() => logout()}
+                className="px-2 py-1 text-[11px] font-bold text-[#ef4444] border border-red-500/20 rounded hover:bg-rose-500/5 transition cursor-pointer"
+              >
+                登出
+              </button>
+            </div>
+          </header>
+
+          {/* Mobile Items Stack in Sequence 1 to 8 */}
+          <div className="flex flex-col gap-6 px-4 py-4 w-full max-w-full overflow-hidden">
+            {/* 1. Hero 川普區 */}
+            <div
+              id="mobile-hero-section"
+              className="flex flex-col gap-4 border border-slate-800/80 rounded-2xl bg-[#0a0d16] shadow-xl w-full max-w-full overflow-hidden"
+              style={{ height: 'auto', padding: '20px' }}
+            >
+              <img
+                src="/images/hero-trump.png"
+                alt="Hero Background"
+                referrerPolicy="no-referrer"
+                className="pointer-events-none select-none rounded-xl"
+                style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
+              />
+              
+              {/* 文字內容放圖片下方 */}
+              <div className="flex flex-col gap-3 text-left w-full">
+                <div className="text-[16px] text-amber-500 font-bold tracking-wider" style={{ lineHeight: '1.6' }}>
+                  白宮戰略會議
+                </div>
+                <div className="text-[24px] text-white font-black uppercase tracking-tight" style={{ lineHeight: '1.6' }}>
+                  PRESIDENT TRUMP
+                </div>
+                <div className="text-[22px] text-slate-300 italic font-medium border-l-4 border-amber-500/60 pl-4 py-1" style={{ lineHeight: '1.6' }}>
+                  {currentScenario?.trumpQuote || "偉大的國家不是等待機會，而是創造機會。我們要把製造業、財富與美麗的承諾全部帶回美國本土！"}
+                </div>
+              </div>
+            </div>
+
+            {/* 右上日期卡改成一般卡片放在 Hero 下方 */}
+            <div
+              id="mobile-date-card"
+              className="w-full p-4 bg-slate-950/90 border border-slate-800 rounded-xl flex items-center justify-between shadow-md"
+            >
+              <div className="text-left">
+                <span className="text-amber-500 text-sm font-bold block">第 {turn} 回合</span>
+                <span className="text-white text-base font-black font-mono tracking-tight">{currentScenario?.dateString || "2025年5月28日"}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 text-[10px] block font-mono">STATUS</span>
+                <span className="text-amber-400 text-sm font-bold font-sans">上任第 {currentScenario?.daysOfPresidency || "150"} 天</span>
+              </div>
+            </div>
+
+            {/* 2. 狀態數值 */}
+            <div id="mobile-stats-section" className="w-full text-left">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-sm">📊</span>
+                <span className="font-sans text-xs font-bold text-[#F5A623] tracking-widest uppercase">國家核心指標</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 w-full">
+                {/* Economy */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">經濟</span>
+                    <span className="text-base font-black text-amber-500">{stats.economy}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-400" style={{ width: `${stats.economy}%` }} />
+                  </div>
+                </div>
+                {/* Military */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">軍事</span>
+                    <span className="text-base font-black text-amber-500">{stats.military}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-400" style={{ width: `${stats.military}%` }} />
+                  </div>
+                </div>
+                {/* Diplomacy */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">外交</span>
+                    <span className="text-base font-black text-amber-500">{stats.diplomacy}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-400" style={{ width: `${stats.diplomacy}%` }} />
+                  </div>
+                </div>
+                {/* Public Opinion */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">民意</span>
+                    <span className="text-base font-black text-amber-500">{stats.publicOpinion}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-pink-400" style={{ width: `${stats.publicOpinion}%` }} />
+                  </div>
+                </div>
+                {/* Technology */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">科技監控</span>
+                    <span className="text-base font-black text-amber-500">{stats.industry}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-400" style={{ width: `${stats.industry}%` }} />
+                  </div>
+                </div>
+                {/* Market */}
+                <div className="p-3 bg-[#0d111d]/95 border border-slate-800 rounded-xl select-none">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-base font-bold text-slate-400">股市</span>
+                    <span className="text-base font-black text-amber-500">{stats.market}%</span>
+                  </div>
+                  <div className="w-full bg-slate-855 h-1.5 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-400" style={{ width: `${stats.market}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. 當前決策議題 */}
+            <div id="mobile-scenario-section" className="w-full text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <Gavel className="w-5 h-5 text-[#F5A623] shrink-0" />
+                <span className="text-xs font-mono tracking-widest text-[#F5A623] font-bold uppercase">當前決策議題</span>
+              </div>
+              
+              {activeEnding?.isFinalEnding ? (
+                <div className="bg-slate-900 border border-amber-500/20 p-5 rounded-2xl">
+                  <h3 className="text-lg font-bold text-amber-500 mb-2">🏆 歷史推演結算</h3>
+                  <p className="text-base text-slate-300 mb-4">{activeEnding.title}</p>
+                  <button onClick={fetchStartScenario} className="w-full py-3 bg-amber-500 text-black font-extrabold rounded-xl text-base transition cursor-pointer">重開歷史推演</button>
+                </div>
+              ) : showResultPanel && lastSelectedChoice && lastImpacts ? (
+                /* Outcome evaluation results panel inside core strategic view */
+                <div className="bg-[#0f1424]/95 border border-[#F5A623]/25 p-5 rounded-2xl flex flex-col gap-4">
+                  <div className="flex flex-col gap-1 border-b border-slate-800 pb-3">
+                    <span className="text-xs font-mono text-amber-500 font-bold uppercase tracking-wider">DECISION RESULT • 決策結算報告</span>
+                    <div className="text-[16px] font-black text-white">
+                      已執行選項：{lastSelectedChoice.id} - <span className="text-amber-400">{lastSelectedChoice.title}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg flex justify-between">
+                      <span className="text-slate-400">經濟</span>
+                      <span className={`font-bold ${lastImpacts.economy > 0 ? "text-emerald-400" : lastImpacts.economy < 0 ? "text-rose-455" : "text-gray-500"}`}>
+                        {lastImpacts.economy > 0 ? `+${lastImpacts.economy}` : lastImpacts.economy}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg flex justify-between">
+                      <span className="text-slate-400">軍事</span>
+                      <span className={`font-bold ${lastImpacts.military > 0 ? "text-emerald-400" : lastImpacts.military < 0 ? "text-rose-455" : "text-gray-500"}`}>
+                        {lastImpacts.military > 0 ? `+${lastImpacts.military}` : lastImpacts.military}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg flex justify-between">
+                      <span className="text-slate-400">外交</span>
+                      <span className={`font-bold ${lastImpacts.diplomacy > 0 ? "text-emerald-400" : lastImpacts.diplomacy < 0 ? "text-rose-455" : "text-gray-500"}`}>
+                        {lastImpacts.diplomacy > 0 ? `+${lastImpacts.diplomacy}` : lastImpacts.diplomacy}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg flex justify-between">
+                      <span className="text-slate-400">民意</span>
+                      <span className={`font-bold ${(lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) > 0 ? "text-emerald-400" : (lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) < 0 ? "text-rose-455" : "text-gray-500"}`}>
+                        {(lastImpacts.publicOpinion ?? lastImpacts.approval ?? 0) > 0 ? `+${lastImpacts.publicOpinion ?? lastImpacts.approval}` : (lastImpacts.publicOpinion ?? lastImpacts.approval)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {generatedNews && (
+                    <div className="bg-[#12162a] border border-slate-805 p-4 rounded-xl text-left">
+                      <span className="text-xs font-mono text-red-400 font-bold block uppercase mb-1">📡 國家即時公電 FEED:</span>
+                      <h4 className="text-[15px] font-bold text-red-400 mb-1.5">{generatedNews.headline}</h4>
+                      <p className="text-[14px] text-slate-300 leading-relaxed">{generatedNews.content}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleNextTurnClicked}
+                    disabled={!generatedNews}
+                    className={`w-full py-3.5 rounded-xl font-bold transition-all text-base uppercase cursor-pointer ${
+                      generatedNews
+                        ? "bg-amber-500 text-black font-extrabold active:scale-95 shadow-lg"
+                        : "bg-slate-800 text-slate-500 border border-slate-700/40"
+                    }`}
+                  >
+                    繼續主要議程 (Next Agenda)
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 bg-gradient-to-b from-[#11152a] to-[#070a14] border border-slate-800 p-5 rounded-2xl">
+                  <h2 className="font-sans font-black text-white text-[18px] leading-snug">
+                    {currentScenario ? currentScenario.title : "全球貿易戰升級：如何應對中國關稅反制？"}
+                  </h2>
+                  <div className="bg-[#0e1222]/85 border-l-4 border-[#F5A623] p-4 rounded-r-xl">
+                    <p className="leading-[1.7] text-[16px] text-slate-100 font-sans font-normal">
+                      {currentScenario ? currentScenario.subtext : "隨著華盛頓對中加徵高額關稅，關稅效應逐步擴散..."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. 顧問團 */}
+            {currentScenario && currentScenario.advisors && currentScenario.advisors.length > 0 && !showResultPanel && (
+              <div id="mobile-cabinet-section" className="w-full text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5 text-[#F5A623] shrink-0" />
+                  <h3 className="text-base font-bold text-slate-100 tracking-wider font-sans uppercase">白宮內閣最高顧問團建議</h3>
+                </div>
+                <div className="w-full h-[1px] bg-gradient-to-r from-[#F5A623] to-transparent mb-4" />
+                
+                <div className="flex flex-col gap-4">
+                  {currentScenario.advisors.map((adv, idx) => (
+                    <div key={idx} className="bg-gradient-to-b from-[#101426] to-[#070a14] border border-slate-800 rounded-xl p-5 flex flex-col gap-3 shadow-md">
+                      <div className="flex items-center gap-3 border-b border-slate-800/60 pb-2">
+                        <div className="p-1.5 bg-slate-900 border border-slate-805 rounded-lg">
+                          {getAdvisorIcon(adv.icon)}
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-[16px] font-black text-[#F5A623]">{adv.title}</span>
+                          <span className="text-[12px] text-slate-400 font-mono">立場：{adv.position}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-[#070a14]/60 border-l-2 border-amber-500/60 p-3 rounded-r-lg">
+                        <span className="text-[12px] font-mono font-bold text-[#F5A623] block uppercase mb-1">■ 方案建議</span>
+                        <p className="text-[16px] text-slate-100 font-medium leading-[1.6]">{adv.advice}</p>
+                      </div>
+
+                      <div className="bg-rose-500/5 border-l-2 border-rose-500/40 p-3 rounded-r-lg">
+                        <span className="text-[12px] font-mono font-bold text-rose-400 block uppercase mb-1">▲ 風險評鑑警告</span>
+                        <p className="text-[16px] text-slate-300 leading-[1.6]">{adv.risk}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. 決策選項 */}
+            {!showResultPanel && (
+              <div id="mobile-choices-section" className="w-full text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <Briefcase className="w-5 h-5 text-[#F5A623] shrink-0" />
+                  <h3 className="text-base font-bold text-slate-100 tracking-wider font-sans uppercase">簽下總統行政命令</h3>
+                </div>
+                <div className="w-full h-[1px] bg-gradient-to-r from-amber-500 to-transparent mb-4" />
+
+                {activeCrisis ? (
+                  <div className="bg-[#120a0a] border border-red-500/30 p-5 rounded-2xl flex flex-col gap-4">
+                    <div className="text-red-400 text-base font-bold">🚨 突發特急事件：{activeCrisis.title}</div>
+                    <p className="text-[16px] text-slate-300 leading-relaxed">{activeCrisis.description}</p>
+                    <div className="flex flex-col gap-3">
+                      {activeCrisis.choices.map((opt: any) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleSelectCrisisOption(opt.id)}
+                          className="w-full py-3.5 bg-red-650 hover:bg-red-600 text-white font-bold rounded-xl text-base transition-all cursor-pointer"
+                        >
+                          {opt.text || opt.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {currentScenario && shuffledChoices.map((opt) => (
+                      <div key={opt.id} className="bg-gradient-to-b from-[#11152a] to-[#070a14] border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-md">
+                        <div className="flex flex-col gap-3">
+                          <div className="border-b border-slate-800/80 pb-2">
+                            <span className="font-sans font-extrabold text-white text-[18px]">
+                              {getOptionDisplayTitle(opt)}
+                            </span>
+                          </div>
+                          <p className="text-[16px] text-slate-300 leading-[1.7] font-sans">
+                            {opt.description}
+                          </p>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-slate-800/80 mt-4">
+                          <button
+                            onClick={() => handleChoiceSelect(opt)}
+                            className="w-full bg-[#F5A623] text-black font-extrabold rounded-xl flex items-center justify-center gap-2 py-3.5 shadow-md active:scale-95 text-[16px] uppercase cursor-pointer"
+                          >
+                            <span>下達此項行政令</span>
+                            <ArrowRight className="w-4 h-4 text-black font-extrabold shrink-0 stroke-[2.5]" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 6. LIVE STATS */}
+            <div id="mobile-livestats-section" className="w-full text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">📡</span>
+                <span className="font-sans text-xs font-bold text-[#F5A623] tracking-widest leading-none uppercase">LIVE STATS</span>
+              </div>
+              <div className="w-full h-[1px] bg-gradient-to-r from-amber-500 to-transparent mb-3" />
+              
+              <div className="bg-[#0c0f1b]/95 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold mb-2">
+                  <span className="flex items-center gap-1">📡 即時新聞 FEED</span>
+                  <span className="text-[9px] font-mono bg-slate-900 px-1.5 py-0.5 rounded text-amber-500/80">LIVE FEED ({liveNewsList.length})</span>
+                </div>
+                
+                <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {liveNewsList.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2 py-1.5 border-b border-slate-900 last:border-0 rounded">
+                      <span className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
+                        item.category === 'war' ? 'bg-red-500' :
+                        item.category === 'diplomacy' ? 'bg-amber-500' :
+                        item.category === 'economy' ? 'bg-emerald-500' :
+                        'bg-cyan-400'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-mono text-slate-500 mr-2">{item.time}</span>
+                        <span className="text-[14px] text-slate-300 font-sans">{item.text}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 7. 歷史紀錄 */}
+            <div id="mobile-history-section" className="w-full text-left">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">📜</span>
+                  <span className="font-sans text-xs font-bold text-[#F5A623] tracking-widest leading-none uppercase">歷史紀錄</span>
+                </div>
+                {history.length > 0 && (
+                  <span onClick={() => {
+                    setHistoryModalTab("current");
+                    fetchGameHistoryList();
+                    setIsHistoryModalOpen(true);
+                  }} className="text-xs font-mono text-slate-400 font-bold hover:text-amber-500 cursor-pointer">
+                    查看全部 ({history.length}) »
+                  </span>
+                )}
+              </div>
+              <div className="w-full h-[1px] bg-gradient-to-r from-amber-500 to-transparent mb-3" />
+              
+              <div className="bg-[#0c0f1b]/95 border border-slate-800 rounded-xl p-4">
+                {history.length === 0 ? (
+                  <div className="py-4 text-center border border-dashed border-slate-800 rounded-lg text-slate-500">
+                    <p className="text-xs font-medium">尚無歷史決策</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {history.slice().reverse().slice(0, 3).map((item, index) => {
+                      const originalTurnNum = history.length - index;
+                      return (
+                        <div key={`timeline-mobile-${index}`} className="flex gap-2 items-start">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                          <div className="flex-1 min-w-0 text-slate-200">
+                            <span className="text-xs font-bold text-amber-500 mr-2">第 {originalTurnNum} 回合</span>
+                            <h4 className="text-[14px] font-medium inline">{item.scenarioTitle}</h4>
+                            <span className="block text-xs text-slate-400 mt-0.5">執行方案: {item.chosenOptionTitle}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 8. 總統檔案 */}
+            <div id="mobile-president-dossier" className="w-full text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">👤</span>
+                <span className="font-sans text-xs font-bold text-[#F5A623] tracking-widest leading-none uppercase">總統執政檔案</span>
+              </div>
+              <div className="w-full h-[1px] bg-gradient-to-r from-amber-500 to-transparent mb-3" />
+              
+              <div className="bg-[#0c0f1b]/95 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+                <div className="bg-[#141a2e] border border-slate-850 p-3 rounded-lg flex items-center justify-between">
+                  <span className="text-xs text-slate-400">執政性格：</span>
+                  <span className="text-sm font-black text-amber-400">
+                    {getNewPresidentPersonalityName(presidentPersonality)}
+                  </span>
+                </div>
+
+                <div className="border-l-[3px] border-[#F5A623] p-4 bg-slate-950/45 rounded-r-[6px]">
+                  <blockquote className="text-[16px] leading-[1.7] italic text-slate-300">
+                    「偉大的國家不是等待機會，而是創造機會。我們要把製造業、財富與美麗的承諾全部帶回美國本土！」
+                  </blockquote>
+                </div>
+
+                <button
+                  onClick={fetchStartScenario}
+                  className="mt-2 w-full py-3 bg-[#110e17] hover:bg-[#1a0e1c] border border-amber-500/20 text-amber-400 font-bold rounded-xl text-xs uppercase tracking-widest transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  重新開始最高推演
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic global modals for mobile history view */}
+          <AnimatePresence>
+            {isHistoryModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <div className="bg-[#0c0f1b] border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+                  <div className="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-[#0e1222]">
+                    <h3 className="text-base font-bold text-white">歷次決策備忘錄</h3>
+                    <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-white p-1">✕</button>
+                  </div>
+                  <div className="p-4 overflow-y-auto space-y-4 max-h-full">
+                    {history.map((h, i) => (
+                      <div key={i} className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-left">
+                        <span className="text-xs font-mono text-amber-500 font-bold">第 {i+1} 回合：{h.scenarioTitle}</span>
+                        <p className="text-sm text-[#F5A623] mt-1 font-semibold">✓ {h.chosenOptionTitle}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (
+        /* 💻 DESKTOP & TABLET LAYOUTS */
+        <>
+          {/* ── HEADER ── */}
+          <header id="chronos-header" className="px-6 py-4 bg-[#0a0d16]/90 border-b border-slate-800/60 sticky top-0 z-40 backdrop-blur-md flex items-center justify-between">
         
         {/* Left branding */}
         <div id="company-brand" className="flex items-center gap-4">
@@ -1338,10 +1944,10 @@ export default function App() {
           id="sidebar-controls"
           className="flex flex-col shrink-0 bg-[#070b14] border border-slate-800/80 rounded-2xl shadow-[0_15px_60px_rgba(0,0,0,0.75)] h-full overflow-y-auto custom-scrollbar"
           style={{
-            width: isSidebarCollapsed ? "80px" : "340px",
-            minWidth: isSidebarCollapsed ? "80px" : "340px",
-            maxWidth: isSidebarCollapsed ? "80px" : "340px",
-            padding: isSidebarCollapsed ? "16px 12px" : "24px",
+            width: screenSize === 'desktop' ? (isSidebarCollapsed ? "80px" : "340px") : "100%",
+            minWidth: screenSize === 'desktop' ? (isSidebarCollapsed ? "80px" : "340px") : "100%",
+            maxWidth: screenSize === 'desktop' ? (isSidebarCollapsed ? "80px" : "340px") : "100%",
+            padding: screenSize === 'desktop' ? (isSidebarCollapsed ? "16px 12px" : "24px") : "16px 20px",
             transition: "all 350ms cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
@@ -1363,14 +1969,17 @@ export default function App() {
             </div>
             <span 
               className={`pl-12 transition-all ease-in-out whitespace-nowrap shrink-0 ${
-                isSidebarCollapsed 
+                screenSize === 'desktop' && isSidebarCollapsed 
                   ? "opacity-0 invisible duration-200" 
                   : "opacity-100 visible duration-200 delay-150"
               }`}
             >
-              收合側欄
+              {screenSize === 'desktop' 
+                ? "收合側欄" 
+                : (isSidebarCollapsed ? "展開白宮控制台" : "收合白宮控制台")
+              }
             </span>
-            {isSidebarCollapsed && (
+            {screenSize === 'desktop' && isSidebarCollapsed && (
               <div className="fixed left-[84px] z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-900/95 border border-slate-800 px-3 py-2 rounded-xl text-xs font-bold text-[#f5a623] whitespace-nowrap shadow-[0_4px_20px_rgba(0,0,0,0.5)] flex items-center gap-2">
                 <span>➡️</span> <span>展開側欄</span>
               </div>
@@ -2619,31 +3228,21 @@ export default function App() {
                       </div>
                       <div className="w-full h-[1px] bg-gradient-to-r from-amber-500 to-transparent mb-6" />
 
-                      <div id="scenario-options-grid" className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 select-text">
-                        {currentScenario && currentScenario.options.map((opt) => (
+                      <div id="scenario-options-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4 select-text">
+                        {currentScenario && shuffledChoices.map((opt) => (
                           <div
                             key={opt.id}
                             id={`option-card-${opt.id}`}
                             className="bg-gradient-to-b from-[#11152a] to-[#070a14] border border-slate-800 hover:border-[#F5A623] hover:scale-[1.02] rounded-2xl relative group flex flex-col justify-between transition-all duration-300 shadow-[0_15px_45px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_50px_rgba(245,158,11,0.15)] leading-relaxed p-6 md:p-7 min-h-[340px]"
                           >
                             <div className="flex flex-col gap-4">
-                              {/* Identifier with matching colored designator */}
-                              <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
-                                <span className={`w-11 h-11 rounded-xl flex items-center justify-center font-black border tracking-wider transition-all duration-300 text-lg font-mono ${
-                                  opt.id === "A"
-                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]"
-                                    : opt.id === "B"
-                                    ? "bg-blue-500/10 text-blue-400 border-blue-550/30 shadow-[0_0_10px_rgba(59,130,246,0.15)]"
-                                    : "bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
-                                }`}>
-                                  {opt.id}
-                                </span>
-                                
+                              {/* Option Title (No Letter indicators) */}
+                              <div className="flex items-center border-b border-slate-800 pb-4">
                                 <span className="font-sans font-[800] tracking-wide text-white text-[18px]">
-                                  {opt.title}
+                                  {getOptionDisplayTitle(opt)}
                                 </span>
                               </div>
-
+                              
                               <p className="text-[16px] text-slate-350 leading-[1.8] min-h-[80px] font-sans pr-1">
                                 {opt.description}
                               </p>
@@ -2653,7 +3252,7 @@ export default function App() {
                             <div className="pt-5 border-t border-slate-850/60 mt-4">
                               <button
                                 id={`option-commit-${opt.id}`}
-                                onClick={() => handleSelectOption(opt.id, opt.title, opt.impacts)}
+                                onClick={() => handleChoiceSelect(opt)}
                                 className="w-full bg-[#F5A623] hover:bg-amber-400 text-black font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all outline-none shadow-[0_4px_15px_rgba(245,158,11,0.2)] hover:shadow-[0_8px_25px_rgba(245,158,11,0.4)] active:scale-95 cursor-pointer select-none tracking-widest text-[14px] uppercase py-3.5"
                                 style={{ backgroundColor: "#F5A623" }}
                               >
@@ -2986,6 +3585,7 @@ export default function App() {
           <div className="w-2.5 h-2.5 bg-amber-500/80 transform rotate-45 select-none" />
         </div>
       </section>
+      </> )}
 
       {/* ── EMAIL MODAL (連結 GMAIL 寄信) ── */}
       <AnimatePresence>
