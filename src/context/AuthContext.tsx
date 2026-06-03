@@ -29,6 +29,7 @@ interface AuthContextType {
   verifyOTP: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   saveSMTPConfig: (email: string, appPassword: string) => Promise<void>;
+  syncToGAS: (action: string, data: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -160,48 +161,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Synchronize registered user to Google Sheets via Google Apps Script Web App
-  const syncUserToGoogleSheet = async (
-    userIdOrObj: string | { userId: string; email: string; registrationType: string },
-    emailParam?: string,
-    registrationTypeParam?: string
-  ) => {
-    console.log("同步函數已啟動");
-
-    let userId: string;
-    let email: string;
-    let registrationType: string;
-
-    if (typeof userIdOrObj === "object" && userIdOrObj !== null) {
-      userId = userIdOrObj.userId;
-      email = userIdOrObj.email;
-      registrationType = userIdOrObj.registrationType;
-    } else {
-      userId = userIdOrObj as string;
-      email = emailParam || "";
-      registrationType = registrationTypeParam || "email";
-    }
-
-    console.log("SYNC FUNCTION STARTED", { userId, email, registrationType });
-    
+  // General GAS action sender
+  const syncToGAS = async (action: string, data: any) => {
     // Retrieve environment variable configuration, filtering out the malformed/mangled string if injected by cache or process
     const rawEnvUrl = (((import.meta as any).env?.VITE_GAS_API_URL) || "").trim();
     const GAS_API_URL = (rawEnvUrl && rawEnvUrl.startsWith("https://") && !rawEnvUrl.includes("exeuTzys"))
       ? rawEnvUrl
       : "https://script.google.com/macros/s/AKfycbx4NchHRT5L3TJlrFkHLgq5U9vnkVMho0QZiZnXuTzysFttUvHtQSCOoXhLgrC6U1W1xw/exec";
-    
+
     console.log("1. Targeting GAS URL:", GAS_API_URL);
     console.log("2. Ends with /exec:", GAS_API_URL.endsWith("/exec") || GAS_API_URL.includes("/exec"));
     console.log("3. HTTP Method: POST");
 
     const requestBody = {
       secretToken: "CHRONOS_SUPER_SECRET_TOKEN_2026",
-      action: "syncUser",
-      data: {
-        userId,
-        email,
-        registrationType
-      }
+      action: action,
+      data: data
     };
 
     console.log("4. Request Payload (Body):", JSON.stringify(requestBody, null, 2));
@@ -247,6 +222,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Fallback sync attempt also failed:", retryErr);
       }
     }
+  };
+
+  // Synchronize registered user to Google Sheets via Google Apps Script Web App
+  const syncUserToGoogleSheet = async (
+    userIdOrObj: string | { userId: string; email: string; registrationType: string },
+    emailParam?: string,
+    registrationTypeParam?: string
+  ) => {
+    console.log("同步函數已啟動");
+
+    let userId: string;
+    let email: string;
+    let registrationType: string;
+
+    if (typeof userIdOrObj === "object" && userIdOrObj !== null) {
+      userId = userIdOrObj.userId;
+      email = userIdOrObj.email;
+      registrationType = userIdOrObj.registrationType;
+    } else {
+      userId = userIdOrObj as string;
+      email = emailParam || "";
+      registrationType = registrationTypeParam || "email";
+    }
+
+    console.log("SYNC FUNCTION STARTED", { userId, email, registrationType });
+
+    await syncToGAS("syncUser", {
+      userId,
+      email,
+      registrationType
+    });
   };
 
   // Custom Sign Up with Email + Password (Direct register & Login - OTP flow is bypassed but retained in comments)
@@ -597,6 +603,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           verified: true
         };
 
+        // Record Login via GAS (Failure won't disrupt the game flow)
+        try {
+          await syncToGAS("recordLogin", {
+            userId: loggedUser.uid,
+            email: loggedUser.email,
+            loginTime: new Date().toISOString()
+          });
+        } catch (loginErr) {
+          console.error("Failed to record login to Google Sheet:", loginErr);
+        }
+
         setUser(loggedUser);
         localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
 
@@ -637,6 +654,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verified: true
       };
 
+      // Record Login via GAS (Failure won't disrupt the game flow)
+      try {
+        await syncToGAS("recordLogin", {
+          userId: loggedUser.uid,
+          email: loggedUser.email,
+          loginTime: new Date().toISOString()
+        });
+      } catch (loginErr) {
+        console.error("Failed to record login to Google Sheet:", loginErr);
+      }
+
       setUser(loggedUser);
       localStorage.setItem("chronos_user", JSON.stringify(loggedUser));
 
@@ -667,7 +695,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       verifyOTP,
       logout,
-      saveSMTPConfig
+      saveSMTPConfig,
+      syncToGAS
     }}>
       {children}
     </AuthContext.Provider>

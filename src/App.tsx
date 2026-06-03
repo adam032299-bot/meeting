@@ -269,7 +269,7 @@ const getAdvisorIcon = (iconName: string) => {
 };
 
 export default function App() {
-  const { user, loading: authLoading, logout, isPlaceholderFirebase } = useAuth();
+  const { user, loading: authLoading, logout, isPlaceholderFirebase, syncToGAS } = useAuth();
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isLargeScreen, setIsLargeScreen] = useState<boolean>(true);
@@ -420,6 +420,29 @@ export default function App() {
       } catch (firestoreErr) {
         console.error("Firestore save error, fallback to local indexing:", firestoreErr);
       }
+    }
+
+    // Sync completeGame via GAS (Failure won't disrupt the game flow)
+    try {
+      let endingDescription = endingTitle;
+      try {
+        const ending = calculateEnding({ stats: finalStats, history: playedHistory, turn: playedHistory.length + 1 });
+        endingDescription = ending.desc;
+      } catch (endingCalcErr) {
+        console.error("Failed to calculate ending desc for GAS:", endingCalcErr);
+      }
+
+      await syncToGAS("completeGame", {
+        userId: user?.uid || "guest",
+        gameHistory: gameRecord,
+        endings: {
+          title: endingTitle,
+          rating: rating,
+          description: endingDescription
+        }
+      });
+    } catch (completeGameErr) {
+      console.error("Failed to sync completed game result via GAS completeGame:", completeGameErr);
     }
 
     setIsGeneratingReport(false);
@@ -822,6 +845,24 @@ export default function App() {
       
       const updatedHistory = [...history, historyItem];
       setHistory(updatedHistory);
+
+      // Trigger Google Apps Script saveGame sync (Failure won't disrupt the game flow)
+      try {
+        await syncToGAS("saveGame", {
+          userId: user?.uid || "guest",
+          currentTurn: turn,
+          currentStats: newStats,
+          currentDecisions: updatedHistory.map((h, idx) => ({
+            round: idx + 1,
+            scenarioTitle: h.scenarioTitle,
+            chosenOptionId: h.chosenOptionId,
+            chosenOptionTitle: h.chosenOptionTitle,
+            daysOfPresidency: h.daysOfPresidency
+          }))
+        });
+      } catch (saveGameErr) {
+        console.error("Failed to sync current game stage save via GAS saveGame:", saveGameErr);
+      }
 
       // Scroll scenario window to top
       const scrollEl = document.getElementById("diplomatic-deck");
